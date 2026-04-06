@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from datetime import datetime, timezone
 import json
 import os
@@ -71,6 +71,7 @@ EVIDENCE_BLOCK_PATTERN = re.compile(
     r"\[\[FILE:(?P<path>.+?)\s*\|\s*SECTION:(?P<section>\d+)\s*\|\s*SCORE:(?P<score>-?\d+(?:\.\d+)?)\s*\|\s*HEADING:(?P<heading>.*?)\]\]\s*(?P<body>.*?)(?=(?:\n\n==========\n\n|\n\n----------\n\n|\Z))",
     re.DOTALL,
 )
+IMAGE_NOTE_LINE_PATTERN = re.compile(r"(?im)^\s*-\s*image\s*:\s*`?([^\n`]+)`?\s*$")
 
 
 def _normalize_whitespace(text: str) -> str:
@@ -102,8 +103,49 @@ def _extract_evidence_entries(section_output: str) -> List[Dict[str, str]]:
         if len(snippet) > MAX_EVIDENCE_SNIPPET_LENGTH:
             snippet = snippet[:MAX_EVIDENCE_SNIPPET_LENGTH].rstrip() + "..."
         snippet = snippet.replace('"', "'")
-        entries.append({"file_path": file_path, "snippet": snippet})
+        image_path = _extract_image_path_from_note(file_path)
+        evidence_item = {"file_path": file_path, "snippet": snippet}
+        if image_path:
+            evidence_item["image_path"] = image_path
+        entries.append(evidence_item)
     return entries
+
+
+def _extract_image_path_from_note(note_rel_path: str) -> Optional[str]:
+    rel_path = (note_rel_path or "").strip().replace("\\", "/").lstrip("/")
+    if not rel_path.lower().startswith("image-notes/"):
+        return None
+    if not rel_path.lower().endswith(".md"):
+        return None
+
+    kb_root = Path(settings.knowledge_base_chunks).resolve()
+    try:
+        note_path = (kb_root / rel_path).resolve()
+        note_path.relative_to(kb_root)
+    except Exception:
+        return None
+    if not note_path.is_file():
+        return None
+
+    try:
+        content = note_path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    match = IMAGE_NOTE_LINE_PATTERN.search(content)
+    if not match:
+        return None
+
+    image_rel = match.group(1).strip().replace("\\", "/").lstrip("/")
+    if not image_rel:
+        return None
+    try:
+        image_path = (kb_root / image_rel).resolve()
+        image_path.relative_to(kb_root)
+    except Exception:
+        return None
+    if not image_path.is_file():
+        return None
+    return image_rel
 
 
 def _merge_evidence_pool(
@@ -140,7 +182,10 @@ def _format_answer_with_evidence(answer: str, evidence_pool: List[Dict[str, str]
     for idx, item in enumerate(evidence_pool[:MAX_FINAL_EVIDENCE_ITEMS], start=1):
         file_path = item.get("file_path", "").strip() or "unknown"
         snippet = item.get("snippet", "").strip() or "(空片段)"
+        image_path = item.get("image_path", "").strip()
         lines.append(f"{idx}. 来源文件: `{file_path}`")
+        if image_path:
+            lines.append(f"   原始图片: `{image_path}`")
         lines.append(f"   证据片段: \"{snippet}\"")
 
     return "\n".join(lines).strip()
@@ -628,6 +673,24 @@ async def retrieve_files(request: FileRetrievalRequest):
         return {"content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/knowledge-base/file/{file_path:path}")
+async def get_knowledge_base_file(file_path: str):
+    kb_root = Path(settings.knowledge_base_chunks).resolve()
+    normalized = (file_path or "").strip().replace("\\", "/").lstrip("/")
+    if not normalized:
+        raise HTTPException(status_code=400, detail="file_path cannot be empty")
+
+    try:
+        target = (kb_root / normalized).resolve()
+        target.relative_to(kb_root)
+    except Exception:
+        raise HTTPException(status_code=403, detail="Invalid file path")
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(str(target))
 
 
 @app.post("/voice/draft", response_model=VoiceDraftResponse)

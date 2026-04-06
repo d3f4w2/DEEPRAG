@@ -3,6 +3,7 @@ import { User, Bot, ChevronDown, ChevronRight, Wrench, FileText, Copy, Check } f
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, RetrievalJudge } from '../types';
+import { API_BASE_URL } from '../api';
 import './ChatMessage.css';
 
 interface ChatMessageProps {
@@ -15,6 +16,7 @@ interface ChatMessageProps {
 interface EvidenceItem {
   filePath: string;
   snippet: string;
+  imagePath?: string;
 }
 
 interface ParsedAssistantAnswer {
@@ -23,6 +25,19 @@ interface ParsedAssistantAnswer {
 }
 
 const EVIDENCE_HEADER_REGEX = /(?:^|\n)#{2,3}\s*(证据|evidence)\s*\n/i;
+
+const buildKnowledgeFileUrl = (relativePath: string): string => {
+  const normalized = (relativePath || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!normalized) {
+    return '';
+  }
+  const encodedPath = normalized
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+  return `${API_BASE_URL}/knowledge-base/file/${encodedPath}`;
+};
 
 const parseAssistantAnswerWithEvidence = (content: string): ParsedAssistantAnswer => {
   if (!content?.trim()) {
@@ -48,8 +63,10 @@ const parseAssistantAnswerWithEvidence = (content: string): ParsedAssistantAnswe
       return;
     }
 
+    const imageMatch = block.match(/(?:原始图片|image)\s*:\s*`?([^\n`]+)`?/i);
     const snippetMatch = block.match(/(?:证据片段|snippet)\s*:\s*["“]?([\s\S]*?)["”]?\s*$/i);
     const filePath = fileMatch[2].trim();
+    const imagePath = (imageMatch?.[1] || '').trim();
     let snippet = (snippetMatch?.[1] || '').trim();
     if (!snippet) {
       snippet = block
@@ -67,6 +84,7 @@ const parseAssistantAnswerWithEvidence = (content: string): ParsedAssistantAnswe
     evidenceItems.push({
       filePath,
       snippet,
+      imagePath: imagePath || undefined,
     });
   });
 
@@ -265,6 +283,19 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, toolCalls, toolResul
                           <div className="evidence-source">
                             来源文件: <code>{item.filePath}</code>
                           </div>
+                          {item.imagePath && (
+                            <div className="evidence-image-wrap">
+                              <div className="evidence-image-label">
+                                原始图片: <code>{item.imagePath}</code>
+                              </div>
+                              <img
+                                className="evidence-image"
+                                src={buildKnowledgeFileUrl(item.imagePath)}
+                                alt={`evidence-${index + 1}`}
+                                loading="lazy"
+                              />
+                            </div>
+                          )}
                           <div className="evidence-snippet">证据片段: "{item.snippet}"</div>
                         </div>
                       ))}

@@ -296,6 +296,32 @@
   color: #f4fff1;
 }
 
+.evidence-image-wrap {
+  margin: 0.45rem 0 0.55rem;
+}
+
+.evidence-image-label {
+  font-size: 0.8rem;
+  color: #c3f7ff;
+  margin-bottom: 0.35rem;
+}
+
+.evidence-image-label code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.12rem 0.3rem;
+  border-radius: 4px;
+  color: #ffffff;
+}
+
+.evidence-image {
+  width: min(100%, 340px);
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  background: rgba(15, 23, 42, 0.5);
+}
+
 .evidence-missing {
   border: 1px dashed rgba(255, 193, 7, 0.5);
   background: rgba(255, 193, 7, 0.1);
