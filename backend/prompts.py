@@ -1,5 +1,10 @@
+import asyncio
 import json
-from typing import Dict, List
+import os
+import random
+import time
+from collections import OrderedDict
+from typing import Any, Dict, List, Tuple
 from datetime import datetime
 from backend.knowledge_base import knowledge_base
 
@@ -186,6 +191,203 @@ def _parse_tool_arguments(arguments: str) -> Dict:
         raise
 
 
+def _clamp_int(value: Any, default: int, min_value: int, max_value: int) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = default
+    return max(min_value, min(parsed, max_value))
+
+
+def _clamp_float(value: Any, default: float, min_value: float, max_value: float) -> float:
+    try:
+        parsed = float(value)
+    except Exception:
+        parsed = default
+    if parsed != parsed:
+        parsed = default
+    return max(min_value, min(parsed, max_value))
+
+
+TOOL_CACHE_TTL_SECONDS = _clamp_float(
+    os.getenv("TOOL_CACHE_TTL_SECONDS"),
+    default=300.0,
+    min_value=0.0,
+    max_value=86_400.0,
+)
+TOOL_CACHE_MAX_ENTRIES = _clamp_int(
+    os.getenv("TOOL_CACHE_MAX_ENTRIES"),
+    default=256,
+    min_value=0,
+    max_value=10_000,
+)
+TOOL_RETRY_MAX_ATTEMPTS = _clamp_int(
+    os.getenv("TOOL_RETRY_MAX_ATTEMPTS"),
+    default=3,
+    min_value=1,
+    max_value=8,
+)
+TOOL_RETRY_BASE_DELAY_SECONDS = _clamp_float(
+    os.getenv("TOOL_RETRY_BASE_DELAY_SECONDS"),
+    default=0.35,
+    min_value=0.0,
+    max_value=10.0,
+)
+TOOL_RETRY_MAX_DELAY_SECONDS = _clamp_float(
+    os.getenv("TOOL_RETRY_MAX_DELAY_SECONDS"),
+    default=3.0,
+    min_value=0.0,
+    max_value=30.0,
+)
+
+_CACHEABLE_TOOL_NAMES = {"search_paths", "retrieve_sections"}
+_RETRYABLE_ERROR_KEYWORDS = (
+    "timeout",
+    "timed out",
+    "connection",
+    "temporarily unavailable",
+    "temporary failure",
+    "reset by peer",
+    "network",
+    "service unavailable",
+    "bad gateway",
+    "gateway timeout",
+    "rate limit",
+    "429",
+    "502",
+    "503",
+    "504",
+)
+
+# LRU + TTL cache for tool outputs to reduce repeated retrieval overhead.
+_tool_cache: "OrderedDict[str, Tuple[float, str]]" = OrderedDict()
+
+
+def _normalize_tool_args(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): _normalize_tool_args(value[k]) for k in sorted(value.keys(), key=str)}
+    if isinstance(value, list):
+        return [_normalize_tool_args(item) for item in value]
+    if isinstance(value, tuple):
+        return [_normalize_tool_args(item) for item in value]
+    return value
+
+
+def _build_tool_cache_key(tool_name: str, args: Dict[str, Any]) -> str:
+    normalized = _normalize_tool_args(args or {})
+    payload = json.dumps(
+        normalized,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"{tool_name}:{payload}"
+
+
+def _cache_get(cache_key: str) -> str | None:
+    if TOOL_CACHE_MAX_ENTRIES <= 0 or TOOL_CACHE_TTL_SECONDS <= 0:
+        return None
+    cached = _tool_cache.get(cache_key)
+    if not cached:
+        return None
+
+    expires_at, content = cached
+    if expires_at <= time.time():
+        _tool_cache.pop(cache_key, None)
+        return None
+
+    _tool_cache.move_to_end(cache_key)
+    return content
+
+
+def _cache_set(cache_key: str, content: str) -> None:
+    if TOOL_CACHE_MAX_ENTRIES <= 0 or TOOL_CACHE_TTL_SECONDS <= 0:
+        return
+
+    expires_at = time.time() + TOOL_CACHE_TTL_SECONDS
+    _tool_cache[cache_key] = (expires_at, content)
+    _tool_cache.move_to_end(cache_key)
+
+    while len(_tool_cache) > TOOL_CACHE_MAX_ENTRIES:
+        _tool_cache.popitem(last=False)
+
+
+def _is_retryable_exception(exc: Exception) -> bool:
+    text = str(exc).strip().lower()
+    if not text:
+        return False
+    return any(keyword in text for keyword in _RETRYABLE_ERROR_KEYWORDS)
+
+
+def _backoff_delay_seconds(attempt_index: int) -> float:
+    # Exponential backoff with jitter to avoid synchronized retries.
+    if TOOL_RETRY_BASE_DELAY_SECONDS <= 0:
+        return 0.0
+    exponential = TOOL_RETRY_BASE_DELAY_SECONDS * (2 ** max(0, attempt_index - 1))
+    capped = min(exponential, TOOL_RETRY_MAX_DELAY_SECONDS)
+    jitter = capped * random.uniform(0.0, 0.25)
+    return max(0.0, capped + jitter)
+
+
+async def _run_tool_once(tool_name: str, args: Dict[str, Any]) -> str:
+    if tool_name == "search_paths":
+        query = args.get("query", "")
+        top_k = args.get("top_k", 5)
+        return await knowledge_base.search_paths(query=query, top_k=top_k)
+    if tool_name == "retrieve_sections":
+        file_paths = args.get("file_paths", [])
+        query = args.get("query", "")
+        max_sections = args.get("max_sections_per_file", 2)
+        return await knowledge_base.retrieve_sections(
+            file_paths=file_paths,
+            query=query,
+            max_sections_per_file=max_sections,
+        )
+    if tool_name == "retrieve_files":
+        return (
+            "Tool `retrieve_files` is disabled in this agentic mode. "
+            "Use `search_paths` first, then `retrieve_sections`."
+        )
+    return f"Unsupported tool: {tool_name}"
+
+
+async def _run_tool_with_retry(
+    tool_name: str,
+    args: Dict[str, Any],
+) -> Tuple[str, Dict[str, Any]]:
+    attempts = 0
+    retry_count = 0
+    last_exc: Exception | None = None
+
+    for attempt in range(1, TOOL_RETRY_MAX_ATTEMPTS + 1):
+        attempts = attempt
+        try:
+            content = await _run_tool_once(tool_name, args)
+            return content, {
+                "attempts": attempts,
+                "retry_count": retry_count,
+                "retry_exhausted": False,
+            }
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= TOOL_RETRY_MAX_ATTEMPTS or not _is_retryable_exception(exc):
+                break
+            retry_count += 1
+            delay = _backoff_delay_seconds(attempt)
+            if delay > 0:
+                await asyncio.sleep(delay)
+
+    error_text = str(last_exc) if last_exc else "unknown tool error"
+    return (
+        f"Error executing {tool_name}: {error_text}",
+        {
+            "attempts": attempts,
+            "retry_count": retry_count,
+            "retry_exhausted": True,
+        },
+    )
+
+
 async def process_tool_calls(tool_calls: List[Dict]) -> List[Dict]:
     results = []
 
@@ -193,38 +395,51 @@ async def process_tool_calls(tool_calls: List[Dict]) -> List[Dict]:
         tool_name = tool_call.get("function", {}).get("name")
         try:
             args = _parse_tool_arguments(tool_call["function"]["arguments"])
+            cache_key = ""
+            cache_hit = False
+            retry_meta: Dict[str, Any] = {
+                "attempts": 0,
+                "retry_count": 0,
+                "retry_exhausted": False,
+            }
 
-            if tool_name == "search_paths":
-                query = args.get("query", "")
-                top_k = args.get("top_k", 5)
-                content = await knowledge_base.search_paths(query=query, top_k=top_k)
-            elif tool_name == "retrieve_sections":
-                file_paths = args.get("file_paths", [])
-                query = args.get("query", "")
-                max_sections = args.get("max_sections_per_file", 2)
-                content = await knowledge_base.retrieve_sections(
-                    file_paths=file_paths,
-                    query=query,
-                    max_sections_per_file=max_sections,
-                )
-            elif tool_name == "retrieve_files":
-                content = (
-                    "Tool `retrieve_files` is disabled in this agentic mode. "
-                    "Use `search_paths` first, then `retrieve_sections`."
-                )
+            if tool_name in _CACHEABLE_TOOL_NAMES:
+                cache_key = _build_tool_cache_key(tool_name, args)
+                cached = _cache_get(cache_key)
+                if cached is not None:
+                    content = cached
+                    cache_hit = True
+                else:
+                    content, retry_meta = await _run_tool_with_retry(tool_name, args)
+                    if not retry_meta.get("retry_exhausted", False):
+                        _cache_set(cache_key, content)
             else:
-                content = f"Unsupported tool: {tool_name}"
+                content, retry_meta = await _run_tool_with_retry(tool_name, args)
 
             results.append({
                 "role": "tool",
                 "tool_call_id": tool_call.get("id"),
-                "content": content
+                "content": content,
+                "meta": {
+                    "tool_name": tool_name,
+                    "cache_hit": cache_hit,
+                    "attempts": int(retry_meta.get("attempts", 0) or 0),
+                    "retry_count": int(retry_meta.get("retry_count", 0) or 0),
+                    "retry_exhausted": bool(retry_meta.get("retry_exhausted", False)),
+                },
             })
         except Exception as e:
             results.append({
                 "role": "tool",
                 "tool_call_id": tool_call.get("id"),
-                "content": f"Error executing {tool_name}: {str(e)}"
+                "content": f"Error executing {tool_name}: {str(e)}",
+                "meta": {
+                    "tool_name": tool_name,
+                    "cache_hit": False,
+                    "attempts": 0,
+                    "retry_count": 0,
+                    "retry_exhausted": True,
+                },
             })
 
     return results
@@ -255,42 +470,25 @@ def parse_react_response(text: str) -> tuple:
 async def process_react_response(text: str) -> tuple:
     """Process ReAct response and execute actions"""
     action, action_input, has_action = parse_react_response(text)
-
-    if has_action and action == "retrieve_files":
-        file_paths = action_input.get("file_paths", [])
-        content = await knowledge_base.retrieve_files(file_paths)
-
-        return {
-            "action": action,
-            "input": action_input,
-            "observation": content
-        }, True
-
-    if has_action and action == "search_paths":
-        query = action_input.get("query", "")
-        top_k = action_input.get("top_k", 5)
-        content = await knowledge_base.search_paths(query=query, top_k=top_k)
+    if has_action and action in {"retrieve_files", "search_paths", "retrieve_sections"}:
+        synthetic_tool_call = {
+            "id": "react_call",
+            "type": "function",
+            "function": {
+                "name": action,
+                "arguments": json.dumps(action_input or {}, ensure_ascii=False),
+            },
+        }
+        tool_results = await process_tool_calls([synthetic_tool_call])
+        first_result = tool_results[0] if tool_results else {}
+        content = str(first_result.get("content", ""))
+        meta = first_result.get("meta", {})
 
         return {
             "action": action,
             "input": action_input,
-            "observation": content
-        }, True
-
-    if has_action and action == "retrieve_sections":
-        file_paths = action_input.get("file_paths", [])
-        query = action_input.get("query", "")
-        max_sections = action_input.get("max_sections_per_file", 2)
-        content = await knowledge_base.retrieve_sections(
-            file_paths=file_paths,
-            query=query,
-            max_sections_per_file=max_sections,
-        )
-
-        return {
-            "action": action,
-            "input": action_input,
-            "observation": content
+            "observation": content,
+            "meta": meta,
         }, True
 
     return None, False

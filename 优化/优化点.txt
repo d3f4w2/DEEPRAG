@@ -1,0 +1,31 @@
+# 先 Ctrl+C 停掉当前 uvicorn
+cd C:\Users\24719\Desktop\RAG
+python -m pip install -r requirements.txt
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+cd C:\Users\24719\Desktop\RAG\frontend
+npm install
+npm run dev
+
+
+结论先给你：RAG主链可以先“收敛”，不建议再做大改；下一步更值得做的是“多模态最小闭环 + Agentic能力升级”。
+
+你现在的工程已经有比较完整的文本RAG闭环了：两阶段检索、证据池放行、自动补检索都在主链里（backend/main.py:367, backend/main.py:521, backend/react_handler.py:49），检索层也已经是路径检索+段落检索（backend/knowledge_base.py:93, backend/knowledge_base.py:149）。
+但多模态目前基本还没有落地（前后端没有音频/图片入口与处理链路）。
+
+针对“实习项目定位”，我建议这样走：
+
+先补齐“40题优化后 vs baseline”的完整对比，作为文本RAG阶段收官。
+做一个多模态MVP（最小可讲故事版本）：
+语音：ASR -> 转写文本 -> 入库为md(带时间戳/来源)
+图片：OCR/Caption -> 入库为md(带图片路径/页码)
+复用你现有search_paths + retrieve_sections，不用推翻重做。
+Agentic链路继续优化（更像“有自主性”的项目亮点）：
+加预算控制（token/时延上限）
+加“计划-执行-反思”一轮critic
+加工具调用缓存和失败重试策略
+把“停止检索判断”做得更稳（尤其judge失败时的兜底策略）
+
+现在做critic部分，计划执行部分还没开始做
+再做 工具调用缓存 + 失败重试策略（提升稳定性和效率）。
+最后做一次 四项联调验收（预算控制 + critic + 缓存重试 + 停止检索兜底）。

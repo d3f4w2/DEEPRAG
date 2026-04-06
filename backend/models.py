@@ -5,10 +5,19 @@ class Message(BaseModel):
     role: str
     content: str
 
+
+class ChatBudgetConfig(BaseModel):
+    max_total_tokens: Optional[int] = None
+    max_latency_ms: Optional[int] = None
+    price_per_1m_tokens: float = 0.0
+    cost_multiplier: float = 1.0
+
+
 class ChatRequest(BaseModel):
     messages: List[Message]
     provider: Optional[str] = None
     model: Optional[str] = None
+    budget: Optional[ChatBudgetConfig] = None
 
 class FileRetrievalRequest(BaseModel):
     file_paths: List[str] = Field(..., example=[

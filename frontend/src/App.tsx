@@ -1,7 +1,15 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Settings, FileCode, MessageSquare, BarChart3, Mic, Image as ImageIcon } from 'lucide-react';
 import { chatApi } from './api';
-import type { Message, RetrievalJudge, StreamChunk } from './types';
+import type {
+  BudgetSummary,
+  ChatBudgetConfig,
+  Message,
+  ReasoningStage,
+  ReasoningStageMetric,
+  RetrievalCritic,
+  StreamChunk,
+} from './types';
 import ChatMessage from './components/ChatMessage';
 import SystemPromptPanel from './components/SystemPromptPanel';
 import ConfigPanel from './components/ConfigPanel';
@@ -13,6 +21,107 @@ import './App.css';
 
 const MAX_CONTEXT_MESSAGES = 12;
 const TOOL_STATUS_PREFIX = '[TOOL]';
+const BUDGET_CONFIG_STORAGE_KEY = 'deep_rag_budget_config_v1';
+const DEFAULT_BUDGET_CONFIG: ChatBudgetConfig = {
+  max_total_tokens: 60000,
+  max_latency_ms: 90000,
+  price_per_1m_tokens: 2,
+  cost_multiplier: 1,
+};
+const STAGE_ORDER: Record<string, number> = {
+  plan: 10,
+  execute: 20,
+  critic: 30,
+};
+const STAGE_LABELS: Record<string, string> = {
+  plan: 'Plan',
+  execute: 'Execute',
+  critic: 'Judge',
+};
+
+const toNumber = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parseBudgetSummaryFromChunk = (chunk: StreamChunk): BudgetSummary => {
+  const usage = chunk.usage || {};
+  const limits = chunk.limits || {};
+  const pricing = chunk.pricing || {};
+  return {
+    triggered: !!chunk.triggered,
+    reason: chunk.reason || '',
+    total_tokens: Math.max(0, Math.floor(toNumber(usage.total_tokens, 0))),
+    elapsed_ms: Math.max(0, Math.floor(toNumber(usage.elapsed_ms, 0))),
+    max_total_tokens: Math.max(0, Math.floor(toNumber(limits.max_total_tokens, 0))),
+    max_latency_ms: Math.max(0, Math.floor(toNumber(limits.max_latency_ms, 0))),
+    price_per_1m_tokens: Math.max(0, toNumber(pricing.price_per_1m_tokens, 0)),
+    cost_multiplier: Math.max(0, toNumber(pricing.cost_multiplier, 1)),
+    cost_estimate_usd: Math.max(0, toNumber(chunk.cost_estimate_usd, 0)),
+  };
+};
+
+const normalizeReasoningMetrics = (metrics: StreamChunk['metrics']): ReasoningStageMetric[] => {
+  if (!Array.isArray(metrics)) {
+    return [];
+  }
+  return metrics.reduce<ReasoningStageMetric[]>((acc, item) => {
+    const label = String(item?.label || '').trim();
+    const value = String(item?.value || '').trim();
+    if (!label || !value) {
+      return acc;
+    }
+    const tone = String(item?.tone || '').trim().toLowerCase();
+    acc.push({
+      label,
+      value,
+      tone: tone || undefined,
+    });
+    return acc;
+  }, []);
+};
+
+const parseReasoningStageFromChunk = (chunk: StreamChunk): ReasoningStage | null => {
+  const stageKey = String(chunk.stage_key || '')
+    .trim()
+    .toLowerCase();
+  if (!stageKey) {
+    return null;
+  }
+
+  const defaultLabel = STAGE_LABELS[stageKey] || stageKey.toUpperCase();
+  const mode = String(chunk.mode || 'llm').trim() || 'llm';
+  const numericOrder = toNumber(chunk.order, Number.NaN);
+  const order = Number.isFinite(numericOrder) ? numericOrder : (STAGE_ORDER[stageKey] ?? 99);
+
+  return {
+    stage_key: stageKey,
+    stage_label: String(chunk.stage_label || defaultLabel).trim() || defaultLabel,
+    title: String(chunk.title || `${defaultLabel} 更新`).trim() || `${defaultLabel} 更新`,
+    summary: String(chunk.summary || '').trim(),
+    status: String(chunk.status || 'running').trim().toLowerCase() || 'running',
+    mode,
+    badge: String(chunk.badge || mode.toUpperCase()).trim() || mode.toUpperCase(),
+    order,
+    updated_at: String(chunk.updated_at || new Date().toISOString()),
+    metrics: normalizeReasoningMetrics(chunk.metrics),
+  };
+};
+
+const mergeReasoningStages = (
+  currentStages: ReasoningStage[],
+  nextStage: ReasoningStage,
+): ReasoningStage[] => {
+  const stageMap = new Map<string, ReasoningStage>();
+  currentStages.forEach((stage) => {
+    stageMap.set(stage.stage_key, stage);
+  });
+  stageMap.set(nextStage.stage_key, nextStage);
+
+  return Array.from(stageMap.values()).sort(
+    (a, b) => a.order - b.order || a.stage_key.localeCompare(b.stage_key),
+  );
+};
 
 function App() {
   const [activePage, setActivePage] = useState<'chat' | 'evaluation' | 'voice' | 'image'>('chat');
@@ -25,7 +134,11 @@ function App() {
   const [selectedModel, setSelectedModel] = useState('');
   const [messageToolCalls, setMessageToolCalls] = useState<Map<number, any[]>>(new Map());
   const [messageToolResults, setMessageToolResults] = useState<Map<number, any[]>>(new Map());
-  const [messageRetrievalJudge, setMessageRetrievalJudge] = useState<Map<number, RetrievalJudge>>(new Map());
+  const [messageReasoningStages, setMessageReasoningStages] = useState<Map<number, ReasoningStage[]>>(new Map());
+  const [messageRetrievalCritic, setMessageRetrievalCritic] = useState<Map<number, RetrievalCritic>>(new Map());
+  const [messageBudgetSummary, setMessageBudgetSummary] = useState<Map<number, BudgetSummary>>(new Map());
+  const [showBudgetPanel, setShowBudgetPanel] = useState(false);
+  const [budgetConfig, setBudgetConfig] = useState<ChatBudgetConfig>(DEFAULT_BUDGET_CONFIG);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +151,32 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BUDGET_CONFIG_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as ChatBudgetConfig;
+      setBudgetConfig({
+        max_total_tokens: Math.max(0, Math.floor(toNumber(parsed.max_total_tokens, DEFAULT_BUDGET_CONFIG.max_total_tokens || 0))),
+        max_latency_ms: Math.max(0, Math.floor(toNumber(parsed.max_latency_ms, DEFAULT_BUDGET_CONFIG.max_latency_ms || 0))),
+        price_per_1m_tokens: Math.max(0, toNumber(parsed.price_per_1m_tokens, DEFAULT_BUDGET_CONFIG.price_per_1m_tokens || 0)),
+        cost_multiplier: Math.max(0, toNumber(parsed.cost_multiplier, DEFAULT_BUDGET_CONFIG.cost_multiplier || 1)),
+      });
+    } catch (error) {
+      console.error('Failed to load budget config:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BUDGET_CONFIG_STORAGE_KEY, JSON.stringify(budgetConfig));
+    } catch (error) {
+      console.error('Failed to persist budget config:', error);
+    }
+  }, [budgetConfig]);
 
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
@@ -61,6 +200,34 @@ function App() {
     } catch (error) {
       console.error('Failed to load providers:', error);
     }
+  };
+
+  const findLatestAssistantAnswerIndex = (items: Message[]): number => {
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      const item = items[i];
+      if (item.role === 'assistant' && !(item.content || '').startsWith(TOOL_STATUS_PREFIX)) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  const updateBudgetConfig = (
+    key: keyof ChatBudgetConfig,
+    value: string,
+    options: { float?: boolean } = {},
+  ) => {
+    setBudgetConfig((prev) => {
+      const parsed = options.float ? Number.parseFloat(value) : Number.parseInt(value, 10);
+      const fallback = options.float
+        ? Number(prev[key] ?? (key === 'cost_multiplier' ? 1 : 0))
+        : Number(prev[key] ?? 0);
+      const nextValue = Number.isFinite(parsed) ? parsed : fallback;
+      return {
+        ...prev,
+        [key]: Math.max(0, nextValue),
+      };
+    });
   };
 
   const handleSendMessage = async (messageText?: string) => {
@@ -95,6 +262,12 @@ function App() {
         messages: compactMessages,
         provider: selectedProvider,
         model: selectedModel,
+        budget: {
+          max_total_tokens: Math.max(0, Math.floor(toNumber(budgetConfig.max_total_tokens, 0))),
+          max_latency_ms: Math.max(0, Math.floor(toNumber(budgetConfig.max_latency_ms, 0))),
+          price_per_1m_tokens: Math.max(0, toNumber(budgetConfig.price_per_1m_tokens, 0)),
+          cost_multiplier: Math.max(0, toNumber(budgetConfig.cost_multiplier, 1)),
+        },
       });
 
       if (!response.body) {
@@ -108,7 +281,9 @@ function App() {
       let currentToolCalls: any[] = [];
       let hasToolCall = false;
       let buffer = '';
-      let latestJudge: RetrievalJudge | null = null;
+      let latestCritic: RetrievalCritic | null = null;
+      let latestBudgetSummary: BudgetSummary | null = null;
+      let latestReasoningStages: ReasoningStage[] = [];
 
       const processChunk = async () => {
         while (true) {
@@ -158,10 +333,24 @@ function App() {
                         targetMessageIndex = newMessages.length - 1;
                       }
 
-                      if (latestJudge && targetMessageIndex >= 0) {
-                        setMessageRetrievalJudge((prevJudgeMap) => {
-                          const newMap = new Map(prevJudgeMap);
-                          newMap.set(targetMessageIndex, latestJudge as RetrievalJudge);
+                      if (latestCritic && targetMessageIndex >= 0) {
+                        setMessageRetrievalCritic((prevCriticMap) => {
+                          const newMap = new Map(prevCriticMap);
+                          newMap.set(targetMessageIndex, latestCritic as RetrievalCritic);
+                          return newMap;
+                        });
+                      }
+                      if (latestReasoningStages.length > 0 && targetMessageIndex >= 0) {
+                        setMessageReasoningStages((prevStageMap) => {
+                          const newMap = new Map(prevStageMap);
+                          newMap.set(targetMessageIndex, [...latestReasoningStages]);
+                          return newMap;
+                        });
+                      }
+                      if (latestBudgetSummary && targetMessageIndex >= 0) {
+                        setMessageBudgetSummary((prevBudgetMap) => {
+                          const newMap = new Map(prevBudgetMap);
+                          newMap.set(targetMessageIndex, latestBudgetSummary as BudgetSummary);
                           return newMap;
                         });
                       }
@@ -200,26 +389,114 @@ function App() {
                     return [...prev];
                   });
                   assistantMessage = '';
-                } else if (parsed.type === 'retrieval_judge') {
-                  latestJudge = {
-                    stop: !!parsed.stop,
-                    reason: parsed.reason || '',
-                  };
+                } else if (parsed.type === 'reasoning_stage') {
+                  const stage = parseReasoningStageFromChunk(parsed);
+                  if (!stage) {
+                    continue;
+                  }
+                  latestReasoningStages = mergeReasoningStages(latestReasoningStages, stage);
                   setMessages((prev) => {
-                    const messageIndex = prev.length - 1;
+                    const messageIndex = findLatestAssistantAnswerIndex(prev);
                     if (messageIndex < 0) {
                       return prev;
                     }
-                    setMessageRetrievalJudge((prevJudgeMap) => {
-                      const newMap = new Map(prevJudgeMap);
+                    setMessageReasoningStages((prevStageMap) => {
+                      const newMap = new Map(prevStageMap);
+                      const merged = mergeReasoningStages(newMap.get(messageIndex) || [], stage);
+                      newMap.set(messageIndex, merged);
+                      return newMap;
+                    });
+                    return [...prev];
+                  });
+                } else if (parsed.type === 'retrieval_critic') {
+                  latestCritic = {
+                    decision:
+                      parsed.decision === 'accept' ||
+                      parsed.decision === 'revise' ||
+                      parsed.decision === 'refuse'
+                        ? parsed.decision
+                        : parsed.stop
+                          ? 'accept'
+                          : 'revise',
+                    stop: !!parsed.stop,
+                    mode: parsed.mode || 'rule',
+                    reason: parsed.reason || '',
+                    confidence: Math.max(0, Math.min(1, Number(parsed.confidence || 0))),
+                    evidence_items: Math.max(0, Math.floor(Number(parsed.evidence_items || 0))),
+                    distinct_files: Math.max(0, Math.floor(Number(parsed.distinct_files || 0))),
+                    matched_evidence_items: Math.max(0, Math.floor(Number(parsed.matched_evidence_items || 0))),
+                    total_snippet_chars: Math.max(0, Math.floor(Number(parsed.total_snippet_chars || 0))),
+                    uncertain_answer: !!parsed.uncertain_answer,
+                    evidence_sufficient: !!parsed.evidence_sufficient,
+                    rule_reason: String(parsed.rule_reason || ''),
+                    query_term_hits: Math.max(0, Math.floor(Number(parsed.query_term_hits || 0))),
+                    query_terms: Math.max(0, Math.floor(Number(parsed.query_terms || 0))),
+                    retrieval_rounds: Math.max(0, Math.floor(Number(parsed.retrieval_rounds || 0))),
+                    max_retrieval_rounds: Math.max(0, Math.floor(Number(parsed.max_retrieval_rounds || 0))),
+                    tool_call_rounds: Math.max(0, Math.floor(Number(parsed.tool_call_rounds || 0))),
+                    max_tool_call_rounds: Math.max(0, Math.floor(Number(parsed.max_tool_call_rounds || 0))),
+                    retry_count_total: Math.max(0, Math.floor(Number(parsed.retry_count_total || 0))),
+                    retry_exhausted_count: Math.max(0, Math.floor(Number(parsed.retry_exhausted_count || 0))),
+                    cache_hit_count: Math.max(0, Math.floor(Number(parsed.cache_hit_count || 0))),
+                    auto_retrieval_rounds: Math.max(0, Math.floor(Number(parsed.auto_retrieval_rounds || 0))),
+                    max_auto_retrieval_rounds: Math.max(0, Math.floor(Number(parsed.max_auto_retrieval_rounds || 0))),
+                  };
+                  setMessages((prev) => {
+                    const messageIndex = findLatestAssistantAnswerIndex(prev);
+                    if (messageIndex < 0) {
+                      return prev;
+                    }
+                    setMessageRetrievalCritic((prevCriticMap) => {
+                      const newMap = new Map(prevCriticMap);
                       newMap.set(messageIndex, {
-                        stop: latestJudge?.stop || false,
-                        reason: latestJudge?.reason || '',
+                        decision: latestCritic?.decision || 'revise',
+                        stop: latestCritic?.stop || false,
+                        mode: latestCritic?.mode || 'rule',
+                        reason: latestCritic?.reason || '',
+                        confidence: latestCritic?.confidence || 0,
+                        evidence_items: latestCritic?.evidence_items || 0,
+                        distinct_files: latestCritic?.distinct_files || 0,
+                        matched_evidence_items: latestCritic?.matched_evidence_items || 0,
+                        total_snippet_chars: latestCritic?.total_snippet_chars || 0,
+                        uncertain_answer: !!latestCritic?.uncertain_answer,
+                        evidence_sufficient: !!latestCritic?.evidence_sufficient,
+                        rule_reason: latestCritic?.rule_reason || '',
+                        query_term_hits: latestCritic?.query_term_hits || 0,
+                        query_terms: latestCritic?.query_terms || 0,
+                        retrieval_rounds: latestCritic?.retrieval_rounds || 0,
+                        max_retrieval_rounds: latestCritic?.max_retrieval_rounds || 0,
+                        tool_call_rounds: latestCritic?.tool_call_rounds || 0,
+                        max_tool_call_rounds: latestCritic?.max_tool_call_rounds || 0,
+                        retry_count_total: latestCritic?.retry_count_total || 0,
+                        retry_exhausted_count: latestCritic?.retry_exhausted_count || 0,
+                        cache_hit_count: latestCritic?.cache_hit_count || 0,
+                        auto_retrieval_rounds: latestCritic?.auto_retrieval_rounds || 0,
+                        max_auto_retrieval_rounds: latestCritic?.max_auto_retrieval_rounds || 0,
                       });
                       return newMap;
                     });
                     return [...prev];
                   });
+                } else if (
+                  parsed.type === 'budget_update' ||
+                  parsed.type === 'budget_guard' ||
+                  parsed.type === 'budget_summary'
+                ) {
+                  latestBudgetSummary = parseBudgetSummaryFromChunk(parsed);
+                  if (parsed.type !== 'budget_update') {
+                    setMessages((prev) => {
+                      const messageIndex = findLatestAssistantAnswerIndex(prev);
+                      if (messageIndex < 0) {
+                        return prev;
+                      }
+                      setMessageBudgetSummary((prevBudgetMap) => {
+                        const newMap = new Map(prevBudgetMap);
+                        newMap.set(messageIndex, latestBudgetSummary as BudgetSummary);
+                        return newMap;
+                      });
+                      return [...prev];
+                    });
+                  }
                 } else if (parsed.type === 'done') {
                   if (assistantMessage && !assistantMessage.includes('<|Final Answer|>')) {
                     setMessages((prev) => {
@@ -238,10 +515,24 @@ function App() {
                         targetMessageIndex = newMessages.length - 1;
                       }
 
-                      if (latestJudge && targetMessageIndex >= 0) {
-                        setMessageRetrievalJudge((prevJudgeMap) => {
-                          const newMap = new Map(prevJudgeMap);
-                          newMap.set(targetMessageIndex, latestJudge as RetrievalJudge);
+                      if (latestCritic && targetMessageIndex >= 0) {
+                        setMessageRetrievalCritic((prevCriticMap) => {
+                          const newMap = new Map(prevCriticMap);
+                          newMap.set(targetMessageIndex, latestCritic as RetrievalCritic);
+                          return newMap;
+                        });
+                      }
+                      if (latestReasoningStages.length > 0 && targetMessageIndex >= 0) {
+                        setMessageReasoningStages((prevStageMap) => {
+                          const newMap = new Map(prevStageMap);
+                          newMap.set(targetMessageIndex, [...latestReasoningStages]);
+                          return newMap;
+                        });
+                      }
+                      if (latestBudgetSummary && targetMessageIndex >= 0) {
+                        setMessageBudgetSummary((prevBudgetMap) => {
+                          const newMap = new Map(prevBudgetMap);
+                          newMap.set(targetMessageIndex, latestBudgetSummary as BudgetSummary);
                           return newMap;
                         });
                       }
@@ -282,6 +573,11 @@ function App() {
 
   const handleClearChat = () => {
     setMessages([]);
+    setMessageToolCalls(new Map());
+    setMessageToolResults(new Map());
+    setMessageReasoningStages(new Map());
+    setMessageRetrievalCritic(new Map());
+    setMessageBudgetSummary(new Map());
   };
 
   return (
@@ -396,7 +692,9 @@ function App() {
                       message={message}
                       toolCalls={messageToolCalls.get(index)}
                       toolResults={messageToolResults.get(index)}
-                      retrievalJudge={messageRetrievalJudge.get(index)}
+                      reasoningStages={messageReasoningStages.get(index)}
+                      retrievalCritic={messageRetrievalCritic.get(index)}
+                      budgetSummary={messageBudgetSummary.get(index)}
                     />
                   ))}
                   {isLoading && (
@@ -411,6 +709,62 @@ function App() {
             </div>
 
             <div className="input-container">
+              <div className="budget-toolbar">
+                <button
+                  className={`budget-toggle ${showBudgetPanel ? 'active' : ''}`}
+                  onClick={() => setShowBudgetPanel((prev) => !prev)}
+                  type="button"
+                >
+                  Budget 设置
+                </button>
+                <span className="budget-toolbar-hint">
+                  按问题控制 token/时延，并显示成本估算
+                </span>
+              </div>
+              {showBudgetPanel && (
+                <div className="budget-panel">
+                  <label className="budget-field">
+                    <span>Token 上限</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={Math.max(0, Math.floor(toNumber(budgetConfig.max_total_tokens, 0)))}
+                      onChange={(e) => updateBudgetConfig('max_total_tokens', e.target.value)}
+                    />
+                  </label>
+                  <label className="budget-field">
+                    <span>时延上限(ms)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={Math.max(0, Math.floor(toNumber(budgetConfig.max_latency_ms, 0)))}
+                      onChange={(e) => updateBudgetConfig('max_latency_ms', e.target.value)}
+                    />
+                  </label>
+                  <label className="budget-field">
+                    <span>1M Token 单价($)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={Math.max(0, toNumber(budgetConfig.price_per_1m_tokens, 0))}
+                      onChange={(e) => updateBudgetConfig('price_per_1m_tokens', e.target.value, { float: true })}
+                    />
+                  </label>
+                  <label className="budget-field">
+                    <span>倍率</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={Math.max(0, toNumber(budgetConfig.cost_multiplier, 1))}
+                      onChange={(e) => updateBudgetConfig('cost_multiplier', e.target.value, { float: true })}
+                    />
+                  </label>
+                </div>
+              )}
               <div className="input-wrapper">
                 {messages.length > 0 && (
                   <button

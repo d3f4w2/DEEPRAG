@@ -3,10 +3,18 @@ export interface Message {
   content: string;
 }
 
+export interface ChatBudgetConfig {
+  max_total_tokens?: number;
+  max_latency_ms?: number;
+  price_per_1m_tokens?: number;
+  cost_multiplier?: number;
+}
+
 export interface ChatRequest {
   messages: Message[];
   provider?: string;
   model?: string;
+  budget?: ChatBudgetConfig;
 }
 
 export interface VoiceDraftRequest {
@@ -82,13 +90,63 @@ export interface ToolCall {
 }
 
 export interface StreamChunk {
-  type: 'content' | 'tool_calls' | 'tool_results' | 'usage' | 'retrieval_judge' | 'done';
+  type:
+    | 'content'
+    | 'tool_calls'
+    | 'tool_results'
+    | 'reasoning_stage'
+    | 'usage'
+    | 'retrieval_critic'
+    | 'budget_update'
+    | 'budget_guard'
+    | 'budget_summary'
+    | 'done';
   content?: string;
   tool_calls?: ToolCall[];
   results?: ToolResult[];
   usage?: Record<string, any>;
+  decision?: 'accept' | 'revise' | 'refuse';
+  mode?: 'llm' | 'fallback' | 'rule' | string;
   stop?: boolean;
   reason?: string;
+  confidence?: number;
+  evidence_items?: number;
+  distinct_files?: number;
+  matched_evidence_items?: number;
+  total_snippet_chars?: number;
+  uncertain_answer?: boolean;
+  evidence_sufficient?: boolean;
+  rule_reason?: string;
+  query_term_hits?: number;
+  query_terms?: number;
+  retrieval_rounds?: number;
+  max_retrieval_rounds?: number;
+  tool_call_rounds?: number;
+  max_tool_call_rounds?: number;
+  retry_count_total?: number;
+  retry_exhausted_count?: number;
+  cache_hit_count?: number;
+  auto_retrieval_rounds?: number;
+  max_auto_retrieval_rounds?: number;
+  stage_key?: string;
+  stage_label?: string;
+  title?: string;
+  summary?: string;
+  status?: string;
+  badge?: string;
+  order?: number;
+  updated_at?: string;
+  metrics?: ReasoningStageMetric[];
+  triggered?: boolean;
+  limits?: {
+    max_total_tokens?: number;
+    max_latency_ms?: number;
+  };
+  pricing?: {
+    price_per_1m_tokens?: number;
+    cost_multiplier?: number;
+  };
+  cost_estimate_usd?: number;
 }
 
 export interface ToolResult {
@@ -97,9 +155,61 @@ export interface ToolResult {
   content: string;
 }
 
-export interface RetrievalJudge {
+export interface RetrievalCritic {
+  decision: 'accept' | 'revise' | 'refuse';
   stop: boolean;
+  mode: string;
   reason: string;
+  confidence: number;
+  evidence_items: number;
+  distinct_files: number;
+  matched_evidence_items?: number;
+  total_snippet_chars?: number;
+  uncertain_answer?: boolean;
+  evidence_sufficient?: boolean;
+  rule_reason?: string;
+  query_term_hits: number;
+  query_terms: number;
+  retrieval_rounds?: number;
+  max_retrieval_rounds?: number;
+  tool_call_rounds?: number;
+  max_tool_call_rounds?: number;
+  retry_count_total?: number;
+  retry_exhausted_count?: number;
+  cache_hit_count?: number;
+  auto_retrieval_rounds?: number;
+  max_auto_retrieval_rounds?: number;
+}
+
+export interface ReasoningStageMetric {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'good' | 'warn' | 'risk' | string;
+}
+
+export interface ReasoningStage {
+  stage_key: string;
+  stage_label: string;
+  title: string;
+  summary: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | string;
+  mode: string;
+  badge: string;
+  order: number;
+  updated_at: string;
+  metrics: ReasoningStageMetric[];
+}
+
+export interface BudgetSummary {
+  triggered: boolean;
+  reason: string;
+  total_tokens: number;
+  elapsed_ms: number;
+  max_total_tokens: number;
+  max_latency_ms: number;
+  price_per_1m_tokens: number;
+  cost_multiplier: number;
+  cost_estimate_usd: number;
 }
 
 export interface EvaluationDataset {

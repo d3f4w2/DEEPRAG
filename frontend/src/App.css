@@ -436,6 +436,68 @@
   z-index: 10;
 }
 
+.budget-toolbar {
+  max-width: 1400px;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.budget-toggle {
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.16);
+  color: #dbeafe;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.budget-toggle.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #cffafe;
+}
+
+.budget-toolbar-hint {
+  font-size: 0.76rem;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.budget-panel {
+  max-width: 1400px;
+  margin: 0 auto 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.budget-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.72rem;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.budget-field input {
+  height: 34px;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(15, 23, 42, 0.62);
+  color: #e2e8f0;
+  outline: none;
+}
+
+.budget-field input:focus {
+  border-color: rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
 .input-wrapper {
   display: flex;
   gap: 0.75rem;
@@ -572,6 +634,10 @@
 
   .input-container {
     padding: 1rem;
+  }
+
+  .budget-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .welcome-screen h2 {
