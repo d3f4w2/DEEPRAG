@@ -1,0 +1,1543 @@
+{
+  "run_name": "baseline_40q",
+  "created_at": "2026-04-05T23:25:02",
+  "题目总数": 40,
+  "results": [
+    {
+      "id": "Q001",
+      "问题": "SW-1300-Youth 的官方售价是多少？",
+      "答案": "SW-1300-Youth 的官方售价是 $599。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"The centerpiece of the SW-1300-Youth is its state-of-the-art 1.3-inch Organic Light-Emitting Diode (OLED) screen. Unlike traditional LCD screens that require a backlight, each pixel in an OLED display generates its own light. This fundamental difference in technology provides sev...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$599",
+            "599美元",
+            "599"
+          ],
+          "命中": true,
+          "命中关键词": "$599"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1300-youth.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5590,
+      "usage_total_output": 153,
+      "usage_total_tokens": 5743,
+      "latency_ms": 15688.56
+    },
+    {
+      "id": "Q002",
+      "问题": "SW-1300-Youth 的标准续航时长是多少？",
+      "答案": "SW-1300-Youth 的标准续航时长是 24 小时。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"The centerpiece of the SW-1300-Youth is its state-of-the-art 1.3-inch Organic Light-Emitting Diode (OLED) screen. Unlike traditional LCD screens that require a backlight, each pixel in an OLED display generates its own light. This fundamental difference in technology provides sev...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "24小时",
+            "24 小时",
+            "24-hour",
+            "24 hours",
+            "24h"
+          ],
+          "命中": true,
+          "命中关键词": "24小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1300-youth.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5619,
+      "usage_total_output": 166,
+      "usage_total_tokens": 5785,
+      "latency_ms": 16486.39
+    },
+    {
+      "id": "Q003",
+      "问题": "SW-1300-Youth 的防尘防水等级是什么？",
+      "答案": "SW-1300-Youth 的防尘防水等级是 **IP65**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"The centerpiece of the SW-1300-Youth is its state-of-the-art 1.3-inch Organic Light-Emitting Diode (OLED) screen. Unlike traditional LCD screens that require a backlight, each pixel in an OLED display generates its own light. This fundamental difference in technology provides sev...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "IP65"
+          ],
+          "命中": true,
+          "命中关键词": "IP65"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1300-youth.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5627,
+      "usage_total_output": 169,
+      "usage_total_tokens": 5796,
+      "latency_ms": 13668.87
+    },
+    {
+      "id": "Q004",
+      "问题": "SW-1300-Youth 使用的屏幕类型是什么？",
+      "答案": "SW-1300-Youth 使用的是 **1.3 英寸 OLED 屏幕**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"The centerpiece of the SW-1300-Youth is its state-of-the-art 1.3-inch Organic Light-Emitting Diode (OLED) screen. Unlike traditional LCD screens that require a backlight, each pixel in an OLED display generates its own light. This fundamental difference in technology provides sev...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "OLED"
+          ],
+          "命中": true,
+          "命中关键词": "OLED"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1300-youth.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5609,
+      "usage_total_output": 182,
+      "usage_total_tokens": 5791,
+      "latency_ms": 14575.6
+    },
+    {
+      "id": "Q005",
+      "问题": "SW-1500-Sport 的官方售价是多少？",
+      "答案": "SW-1500-Sport 的官方售价是 $999。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The remarkable 36-hour battery life is achieved through a holistic approach to power efficiency. It begins with the hardware itself. Every internal component, from the central processing unit to the GPS chipset and the array of biometric sensors, has been selected for its best-in...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The IP68 rating is just the beginning of the SW-1500-Sport's story of durability. The entire physical construction is a testament to robust engineering. The main case is crafted from a fiber-reinforced polymer composite, a material chosen for its incredible strength-to-weight rat...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$999",
+            "999美元",
+            "999"
+          ],
+          "命中": true,
+          "命中关键词": "$999"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1500-sport.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5581,
+      "usage_total_output": 157,
+      "usage_total_tokens": 5738,
+      "latency_ms": 10955.17
+    },
+    {
+      "id": "Q006",
+      "问题": "SW-1500-Sport 的续航时长是多少？",
+      "答案": "SW-1500-Sport 的续航时长是 **36 小时**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The remarkable 36-hour battery life is achieved through a holistic approach to power efficiency. It begins with the hardware itself. Every internal component, from the central processing unit to the GPS chipset and the array of biometric sensors, has been selected for its best-in...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"In a market filled with a wide spectrum of devices, the SW-1500-Sport is deliberately positioned to offer an unparalleled combination of core performance features and rugged reliability at a highly competitive price point of $999. This price is not arbitrary; it is the result of...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "36小时",
+            "36 小时",
+            "36-hour",
+            "36 hours",
+            "36h"
+          ],
+          "命中": true,
+          "命中关键词": "36小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1500-sport.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5496,
+      "usage_total_output": 212,
+      "usage_total_tokens": 5708,
+      "latency_ms": 10314.04
+    },
+    {
+      "id": "Q007",
+      "问题": "SW-1500-Sport 的防护等级是什么？",
+      "答案": "SW-1500-Sport 的防护等级是 **IP68**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The SW-1500-Sport is engineered to thrive in the same challenging conditions where you push your physical limits. Its chassis has been rigorously tested and certified with an IP68 rating, which represents one of the highest standards of protection against environmental ingress. T...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The IP68 rating is just the beginning of the SW-1500-Sport's story of durability. The entire physical construction is a testament to robust engineering. The main case is crafted from a fiber-reinforced polymer composite, a material chosen for its incredible strength-to-weight rat...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"| Feature Category | Specification | |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "IP68"
+          ],
+          "命中": true,
+          "命中关键词": "IP68"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md",
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1500-sport.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5350,
+      "usage_total_output": 197,
+      "usage_total_tokens": 5547,
+      "latency_ms": 10961.4
+    },
+    {
+      "id": "Q008",
+      "问题": "SW-1500-Sport 的屏幕技术是什么？",
+      "答案": "SW-1500-Sport 的屏幕技术是 **TFT**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The remarkable 36-hour battery life is achieved through a holistic approach to power efficiency. It begins with the hardware itself. Every internal component, from the central processing unit to the GPS chipset and the array of biometric sensors, has been selected for its best-in...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1500-Sport.md`\n   证据片段: \"The IP68 rating is just the beginning of the SW-1500-Sport's story of durability. The entire physical construction is a testament to robust engineering. The main case is crafted from a fiber-reinforced polymer composite, a material chosen for its incredible strength-to-weight rat...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "TFT"
+          ],
+          "命中": true,
+          "命中关键词": "TFT"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1500-Sport.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1500-sport.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5589,
+      "usage_total_output": 150,
+      "usage_total_tokens": 5739,
+      "latency_ms": 12428.47
+    },
+    {
+      "id": "Q009",
+      "问题": "SW-1800-Business 的官方售价是多少？",
+      "答案": "SW-1800-Business 的官方售价是 $1899。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The centerpiece of the SW-1800-Business is its expansive 1.8-inch diagonal screen. This specific size was chosen after extensive ergonomic research to strike the perfect balance between providing ample screen real estate for information-dense applications and maintaining a comfor...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The software interface of the SW-1800-Business is designed in concert with the display's hardware capabilities to deliver a seamless and intuitive user experience. * **Business-Oriented Watch Faces:** The device comes pre-loaded with a suite of exclusive watch faces designed for...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$1899",
+            "1899美元",
+            "1899"
+          ],
+          "命中": true,
+          "命中关键词": "$1899"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1800-business.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5642,
+      "usage_total_output": 193,
+      "usage_total_tokens": 5835,
+      "latency_ms": 17087.79
+    },
+    {
+      "id": "Q010",
+      "问题": "SW-1800-Business 的续航时长是多少？",
+      "答案": "SW-1800-Business 的续航时长是 48 小时。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"Hardware is only one part of the equation. The SW-1800-Business employs a sophisticated, multi-layered software approach to power management that intelligently minimizes energy consumption without degrading the user experience. * **Efficient Operating System:** The proprietary op...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The SW-1800-Business is rated for a robust 48 hours of operation under a typical usage scenario. This two-day standard provides a significant buffer, freeing the user from the daily anxiety of needing to recharge and ensuring the watch is always ready for service. * **High-Densit...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "48小时",
+            "48 小时",
+            "48-hour",
+            "48 hours",
+            "48h"
+          ],
+          "命中": true,
+          "命中关键词": "48小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1800-business.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5490,
+      "usage_total_output": 176,
+      "usage_total_tokens": 5666,
+      "latency_ms": 9703.97
+    },
+    {
+      "id": "Q011",
+      "问题": "SW-1800-Business 的防护等级是什么？",
+      "答案": "SW-1800-Business 的防护等级是 **IP67**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The centerpiece of the SW-1800-Business is its expansive 1.8-inch diagonal screen. This specific size was chosen after extensive ergonomic research to strike the perfect balance between providing ample screen real estate for information-dense applications and maintaining a comfor...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The software interface of the SW-1800-Business is designed in concert with the display's hardware capabilities to deliver a seamless and intuitive user experience. * **Business-Oriented Watch Faces:** The device comes pre-loaded with a suite of exclusive watch faces designed for...\"\n3. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"Athletes operate in extreme conditions, and their gear must be able to keep up. The AE-Sport-Athletic is engineered to be unconditionally reliable, featuring a certified IPX7 waterproof rating. This is not a mere 'water-resistant' or 'splash-proof' claim; it is a guarantee of ful...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "IP67"
+          ],
+          "命中": true,
+          "命中关键词": "IP67"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md",
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1800-business.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5607,
+      "usage_total_output": 167,
+      "usage_total_tokens": 5774,
+      "latency_ms": 10365.78
+    },
+    {
+      "id": "Q012",
+      "问题": "SW-1800-Business 的显示类型是什么？",
+      "答案": "SW-1800-Business 的显示类型是 **1.8 英寸 IPS LCD 屏幕**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The centerpiece of the SW-1800-Business is its expansive 1.8-inch diagonal screen. This specific size was chosen after extensive ergonomic research to strike the perfect balance between providing ample screen real estate for information-dense applications and maintaining a comfor...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1800-Business.md`\n   证据片段: \"The software interface of the SW-1800-Business is designed in concert with the display's hardware capabilities to deliver a seamless and intuitive user experience. * **Business-Oriented Watch Faces:** The device comes pre-loaded with a suite of exclusive watch faces designed for...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "LCD",
+            "IPS"
+          ],
+          "命中": true,
+          "命中关键词": "LCD"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-1800-Business.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-1800-business.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5653,
+      "usage_total_output": 224,
+      "usage_total_tokens": 5877,
+      "latency_ms": 13992.28
+    },
+    {
+      "id": "Q013",
+      "问题": "SW-2100-Flagship 的官方售价是多少？",
+      "答案": "SW-2100-Flagship 的官方售价是 **$2999**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The main casing of the SW-2100-Flagship is expertly machined from a solid block of Grade 5 titanium alloy, a material chosen for its exceptional strength-to-weight ratio, superior corrosion resistance, and inherent hypoallergenic properties. This is the same class of material tru...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The durability of the SW-2100-Flagship extends far beyond its IP rating. The combination of the titanium chassis and sapphire crystal front makes it exceptionally resistant to the bumps, drops, and scrapes of everyday life. The device has undergone a battery of rigorous durabilit...\"\n3. 来源文件: `Supplier-Partnership-Records/Chip-Supplier-UniChip.md`\n   证据片段: \"UniChip's competitive advantage is built upon several key technological pillars: * **Ultra-Low-Power Design:** UniChip is a pioneer in designing silicon that operates at minimal power levels. Their expertise spans from architectural design to physical implementation, employing te...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$2999",
+            "2999美元",
+            "2999"
+          ],
+          "命中": true,
+          "命中关键词": "$2999"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md",
+        "Supplier-Partnership-Records/Chip-Supplier-UniChip.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2100-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5497,
+      "usage_total_output": 169,
+      "usage_total_tokens": 5666,
+      "latency_ms": 12814.63
+    },
+    {
+      "id": "Q014",
+      "问题": "SW-2100-Flagship 的标准续航时长是多少？",
+      "答案": "SW-2100-Flagship 的标准续航时长是 72 小时。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The durability of the SW-2100-Flagship extends far beyond its IP rating. The combination of the titanium chassis and sapphire crystal front makes it exceptionally resistant to the bumps, drops, and scrapes of everyday life. The device has undergone a battery of rigorous durabilit...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"One of the most significant achievements of the SW-2100-Flagship is its extraordinary battery life. Through a combination of a high-density battery, the power-efficient S-Pro Fusion chipset, and intelligent software optimizations, the device delivers up to 72 hours of battery lif...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"The centerpiece of the SW-1300-Youth is its state-of-the-art 1.3-inch Organic Light-Emitting Diode (OLED) screen. Unlike traditional LCD screens that require a backlight, each pixel in an OLED display generates its own light. This fundamental difference in technology provides sev...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "72小时",
+            "72 小时",
+            "72-hour",
+            "72 hours",
+            "72h"
+          ],
+          "命中": true,
+          "命中关键词": "72小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2100-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5474,
+      "usage_total_output": 178,
+      "usage_total_tokens": 5652,
+      "latency_ms": 14227.95
+    },
+    {
+      "id": "Q015",
+      "问题": "SW-2100-Flagship 的防护等级是什么？",
+      "答案": "SW-2100-Flagship 的防护等级是 **IP68**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The main casing of the SW-2100-Flagship is expertly machined from a solid block of Grade 5 titanium alloy, a material chosen for its exceptional strength-to-weight ratio, superior corrosion resistance, and inherent hypoallergenic properties. This is the same class of material tru...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The durability of the SW-2100-Flagship extends far beyond its IP rating. The combination of the titanium chassis and sapphire crystal front makes it exceptionally resistant to the bumps, drops, and scrapes of everyday life. The device has undergone a battery of rigorous durabilit...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "IP68"
+          ],
+          "命中": true,
+          "命中关键词": "IP68"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2100-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5621,
+      "usage_total_output": 212,
+      "usage_total_tokens": 5833,
+      "latency_ms": 16986.61
+    },
+    {
+      "id": "Q016",
+      "问题": "SW-2100-Flagship 支持哪两项核心健康监测：心电和血氧吗？请给出名称。",
+      "答案": "是。SW-2100-Flagship 支持的两项核心健康监测名称是：\n\n- ECG\n- SpO2\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The main casing of the SW-2100-Flagship is expertly machined from a solid block of Grade 5 titanium alloy, a material chosen for its exceptional strength-to-weight ratio, superior corrosion resistance, and inherent hypoallergenic properties. This is the same class of material tru...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"The durability of the SW-2100-Flagship extends far beyond its IP rating. The combination of the titanium chassis and sapphire crystal front makes it exceptionally resistant to the bumps, drops, and scrapes of everyday life. The device has undergone a battery of rigorous durabilit...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "ECG",
+            "心电"
+          ],
+          "命中": true,
+          "命中关键词": "ECG"
+        },
+        {
+          "关键词候选": [
+            "SpO2",
+            "血氧"
+          ],
+          "命中": true,
+          "命中关键词": "SpO2"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2100-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5721,
+      "usage_total_output": 197,
+      "usage_total_tokens": 5918,
+      "latency_ms": 21044.15
+    },
+    {
+      "id": "Q017",
+      "问题": "SW-2200-Premium 的官方售价是多少？",
+      "答案": "SW-2200-Premium 的官方售价是 **$4,999**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The SW-2200-Premium is equipped with a next-generation array of sensors, providing a holistic and highly accurate picture of your health, fitness, and environment. * **Multi-Wavelength Optical Heart Rate Sensor:** Uses a combination of green, red, and infrared LEDs to accurately...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The SW-2200-Premium includes a curated selection of three distinct straps, each designed for a specific context and featuring a quick-release mechanism for effortless interchangeability. 1. **The Ocean-Flex Band:** Engineered for athletic pursuits and aquatic adventures, this ban...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$4,999",
+            "$4999",
+            "4999美元",
+            "4999"
+          ],
+          "命中": true,
+          "命中关键词": "$4,999"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2200-premium.md"
+      ],
+      "tool_call_rounds": 4,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections",
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 13372,
+      "usage_total_output": 253,
+      "usage_total_tokens": 13625,
+      "latency_ms": 17403.04
+    },
+    {
+      "id": "Q018",
+      "问题": "SW-2200-Premium 的标准续航时长是多少？",
+      "答案": "SW-2200-Premium 的标准续航时长是 **96 小时**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The SW-2200-Premium is equipped with a next-generation array of sensors, providing a holistic and highly accurate picture of your health, fitness, and environment. * **Multi-Wavelength Optical Heart Rate Sensor:** Uses a combination of green, red, and infrared LEDs to accurately...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The SW-2200-Premium includes a curated selection of three distinct straps, each designed for a specific context and featuring a quick-release mechanism for effortless interchangeability. 1. **The Ocean-Flex Band:** Engineered for athletic pursuits and aquatic adventures, this ban...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "96小时",
+            "96 小时",
+            "96-hour",
+            "96 hours",
+            "4 days",
+            "4天"
+          ],
+          "命中": true,
+          "命中关键词": "96小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2200-premium.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5696,
+      "usage_total_output": 186,
+      "usage_total_tokens": 5882,
+      "latency_ms": 14553.63
+    },
+    {
+      "id": "Q019",
+      "问题": "SW-2200-Premium 的防护等级是什么？",
+      "答案": "SW-2200-Premium 的防护等级是 **IP69K**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The SW-2200-Premium is equipped with a next-generation array of sensors, providing a holistic and highly accurate picture of your health, fitness, and environment. * **Multi-Wavelength Optical Heart Rate Sensor:** Uses a combination of green, red, and infrared LEDs to accurately...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The SW-2200-Premium includes a curated selection of three distinct straps, each designed for a specific context and featuring a quick-release mechanism for effortless interchangeability. 1. **The Ocean-Flex Band:** Engineered for athletic pursuits and aquatic adventures, this ban...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md`\n   证据片段: \"| Feature Category | Specification | |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "IP69K"
+          ],
+          "命中": true,
+          "命中关键词": "IP69K"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md",
+        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2200-premium.md"
+      ],
+      "tool_call_rounds": 3,
+      "tool_call_names": [
+        "search_paths",
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 7668,
+      "usage_total_output": 212,
+      "usage_total_tokens": 7880,
+      "latency_ms": 16363.03
+    },
+    {
+      "id": "Q020",
+      "问题": "SW-2200-Premium 的屏幕技术名称是什么？",
+      "答案": "SW-2200-Premium 的屏幕技术名称是 **Quantum Dot AMOLED Pro Technology**。\n\n### 证据\n1. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"At the heart of the device is a state-of-the-art 2.2-inch Quantum Dot AMOLED Pro display. This advanced screen technology integrates a layer of nano-scale quantum dots with the AMOLED panel, resulting in a significant enhancement of color volume and purity. * **Screen Size:** 2.2...\"\n2. 来源文件: `Product-Line-A-Smartwatch-Series/SW-2200-Premium.md`\n   证据片段: \"The visual interface of the SW-2200-Premium is its most captivating feature. The expansive screen is not just a display; it is an active canvas engineered to deliver breathtaking clarity, color, and brightness in any environment.\"\n3. 来源文件: `Supplier-Partnership-Records/Audio-Supplier-SoundTech.md`\n   证据片段: \"SoundTech's competitive advantage stems from several key areas of expertise: * **Advanced Transducer Technology:** They possess deep knowledge in various transducer types, including dynamic drivers, balanced armatures, and piezoelectric speakers. Their research continually explor...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "Quantum Dot AMOLED Pro",
+            "量子点AMOLED Pro",
+            "AMOLED Pro"
+          ],
+          "命中": true,
+          "命中关键词": "Quantum Dot AMOLED Pro"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-A-Smartwatch-Series/SW-2200-Premium.md",
+        "Supplier-Partnership-Records/Audio-Supplier-SoundTech.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-a-smartwatch-series/sw-2200-premium.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5345,
+      "usage_total_output": 208,
+      "usage_total_tokens": 5553,
+      "latency_ms": 18336.67
+    },
+    {
+      "id": "Q021",
+      "问题": "AE-Lite-Lightweight 的官方售价是多少？",
+      "答案": "AE-Lite-Lightweight 的官方售价是 **$499**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"Our engineering team dedicated countless hours to perfecting the physical form of the AE-Lite-Lightweight. The effectiveness of passive noise reduction is entirely dependent on the quality of the seal between the earbud and the user's ear canal. To achieve a near-universal fit th...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"* **Durability and Build Quality:** For $499, you receive a product built to last. The choice of high-grade polycarbonate for the housing, the precision of the assembly, the quality of the magnetic closures on the case, and the resilience of the charging port all speak to a level...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$499",
+            "499美元",
+            "499"
+          ],
+          "命中": true,
+          "命中关键词": "$499"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-lite-lightweight.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5622,
+      "usage_total_output": 152,
+      "usage_total_tokens": 5774,
+      "latency_ms": 20908.67
+    },
+    {
+      "id": "Q022",
+      "问题": "AE-Lite-Lightweight 的总续航时长是多少？",
+      "答案": "AE-Lite-Lightweight 的总续航时长是 **18 小时**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"We understand that time is a valuable commodity. The AE-Lite-Lightweight's charging system incorporates features designed for convenience and speed. * **Rapid Recharge:** The system supports a fast-charging feature. A very short period of charging in the case can provide a signif...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"The AE-Lite-Lightweight was conceived from a simple yet powerful idea: to create the ultimate audio companion for everyday life. It is the culmination of relentless dedication to our core pillars of performance—effective passive noise isolation for focus, unwavering Bluetooth con...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "18小时",
+            "18 小时",
+            "18-hour",
+            "18 hours",
+            "18h"
+          ],
+          "命中": true,
+          "命中关键词": "18小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-lite-lightweight.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5417,
+      "usage_total_output": 184,
+      "usage_total_tokens": 5601,
+      "latency_ms": 11994.54
+    },
+    {
+      "id": "Q023",
+      "问题": "AE-Lite-Lightweight 的被动降噪深度是多少？",
+      "答案": "AE-Lite-Lightweight 的被动降噪深度是 **20dB**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"Our engineering team dedicated countless hours to perfecting the physical form of the AE-Lite-Lightweight. The effectiveness of passive noise reduction is entirely dependent on the quality of the seal between the earbud and the user's ear canal. To achieve a near-universal fit th...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"* **Durability and Build Quality:** For $499, you receive a product built to last. The choice of high-grade polycarbonate for the housing, the precision of the assembly, the quality of the magnetic closures on the case, and the resilience of the charging port all speak to a level...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "20dB",
+            "20 dB"
+          ],
+          "命中": true,
+          "命中关键词": "20dB"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-lite-lightweight.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5670,
+      "usage_total_output": 171,
+      "usage_total_tokens": 5841,
+      "latency_ms": 10882.66
+    },
+    {
+      "id": "Q024",
+      "问题": "AE-Lite-Lightweight 使用的蓝牙版本是什么？",
+      "答案": "AE-Lite-Lightweight 使用的是 **Bluetooth 5.0**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"In the world of wireless audio, the connection is everything. The AE-Lite-Lightweight is built upon the robust and mature Bluetooth 5.0 platform, a technology chosen specifically for its proven reliability, extended range, and exceptional power efficiency. This isn't just a speci...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"The AE-Lite-Lightweight was conceived from a simple yet powerful idea: to create the ultimate audio companion for everyday life. It is the culmination of relentless dedication to our core pillars of performance—effective passive noise isolation for focus, unwavering Bluetooth con...\"\n3. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"| Feature | Specification | | ----------------------------- | --------------------------------------------------------------------------------------------------------- | | **Noise Cancellation** | Hybrid Active Noise Cancellation with AI Adaptive Algorithm | | **Noise Reduction D...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "Bluetooth 5.0",
+            "蓝牙5.0",
+            "5.0"
+          ],
+          "命中": true,
+          "命中关键词": "Bluetooth 5.0"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md",
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-lite-lightweight.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5435,
+      "usage_total_output": 162,
+      "usage_total_tokens": 5597,
+      "latency_ms": 15724.72
+    },
+    {
+      "id": "Q025",
+      "问题": "AE-Sport-Athletic 的官方售价是多少？",
+      "答案": "AE-Sport-Athletic 的官方售价是 **$799**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"Athletes operate in extreme conditions, and their gear must be able to keep up. The AE-Sport-Athletic is engineered to be unconditionally reliable, featuring a certified IPX7 waterproof rating. This is not a mere 'water-resistant' or 'splash-proof' claim; it is a guarantee of ful...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"At the heart of the AE-Sport-Athletic lies our pioneering bone conduction technology. This revolutionary approach to audio delivery fundamentally changes your relationship with sound during physical activity. Unlike traditional headphones that use air conduction—blocking your ear...\"\n3. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"Our engineering team dedicated countless hours to perfecting the physical form of the AE-Lite-Lightweight. The effectiveness of passive noise reduction is entirely dependent on the quality of the seal between the earbud and the user's ear canal. To achieve a near-universal fit th...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$799",
+            "799美元",
+            "799"
+          ],
+          "命中": true,
+          "命中关键词": "$799"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md",
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-sport-athletic.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5570,
+      "usage_total_output": 171,
+      "usage_total_tokens": 5741,
+      "latency_ms": 10473.31
+    },
+    {
+      "id": "Q026",
+      "问题": "AE-Sport-Athletic 的核心听音技术是什么？",
+      "答案": "AE-Sport-Athletic 的核心听音技术是骨传导技术。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"Athletes operate in extreme conditions, and their gear must be able to keep up. The AE-Sport-Athletic is engineered to be unconditionally reliable, featuring a certified IPX7 waterproof rating. This is not a mere 'water-resistant' or 'splash-proof' claim; it is a guarantee of ful...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"At the heart of the AE-Sport-Athletic lies our pioneering bone conduction technology. This revolutionary approach to audio delivery fundamentally changes your relationship with sound during physical activity. Unlike traditional headphones that use air conduction—blocking your ear...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "骨传导",
+            "Bone conduction",
+            "bone conduction"
+          ],
+          "命中": true,
+          "命中关键词": "骨传导"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-sport-athletic.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5608,
+      "usage_total_output": 170,
+      "usage_total_tokens": 5778,
+      "latency_ms": 11014.87
+    },
+    {
+      "id": "Q027",
+      "问题": "AE-Sport-Athletic 的防水等级是什么？",
+      "答案": "AE-Sport-Athletic 的防水等级是 **IPX7**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"Athletes operate in extreme conditions, and their gear must be able to keep up. The AE-Sport-Athletic is engineered to be unconditionally reliable, featuring a certified IPX7 waterproof rating. This is not a mere 'water-resistant' or 'splash-proof' claim; it is a guarantee of ful...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"At the heart of the AE-Sport-Athletic lies our pioneering bone conduction technology. This revolutionary approach to audio delivery fundamentally changes your relationship with sound during physical activity. Unlike traditional headphones that use air conduction—blocking your ear...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "IPX7"
+          ],
+          "命中": true,
+          "命中关键词": "IPX7"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-sport-athletic.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5589,
+      "usage_total_output": 222,
+      "usage_total_tokens": 5811,
+      "latency_ms": 9556.41
+    },
+    {
+      "id": "Q028",
+      "问题": "AE-Sport-Athletic 的续航时长是多少？",
+      "答案": "AE-Sport-Athletic 的续航时长是 12 小时。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"For an athlete, a dead battery is a dead end. The AE-Sport-Athletic is equipped with a high-density, custom-engineered lithium-polymer battery and an ultra-efficient power management system designed to deliver an exceptional twelve hours of continuous music playback and call time...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md`\n   证据片段: \"A core principle in the design of the AE-Sport-Athletic was that the technology should disappear, allowing you to focus completely on your performance. This is achieved through a meticulous focus on ergonomics, materials, and weight distribution. The frame is built around a flexi...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"The SW-1300-Youth utilizes a custom-designed magnetic charging system for a convenient and hassle-free charging experience. The included charging cable features a circular puck with powerful magnets that automatically align and snap securely onto the back of the watch case. This...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "12小时",
+            "12 小时",
+            "12-hour",
+            "12 hours",
+            "12h"
+          ],
+          "命中": true,
+          "命中关键词": "12小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-sport-athletic.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5447,
+      "usage_total_output": 170,
+      "usage_total_tokens": 5617,
+      "latency_ms": 17401.16
+    },
+    {
+      "id": "Q029",
+      "问题": "AE-Max-Master 的官方售价是多少？",
+      "答案": "AE-Max-Master 的官方售价是 **$1999**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"| Feature | Specification | | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | | **Audio Technology** | Custom 40mm High-Excursion Dynamic Driver, Dynamic Spatial A...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"Our Spatial Audio is more than just a virtual surround sound effect. It is a sophisticated system built on advanced acoustic principles and cutting-edge technology: * **Dynamic Head Tracking:** Integrated within the headphones are high-precision, multi-axis gyroscopes and acceler...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$1999",
+            "1999美元",
+            "1999"
+          ],
+          "命中": true,
+          "命中关键词": "$1999"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-max-master.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5507,
+      "usage_total_output": 154,
+      "usage_total_tokens": 5661,
+      "latency_ms": 13081.2
+    },
+    {
+      "id": "Q030",
+      "问题": "AE-Max-Master 的主动降噪深度是多少？",
+      "答案": "AE-Max-Master 的主动降噪深度是 **50dB**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"| Feature | Specification | | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | | **Audio Technology** | Custom 40mm High-Excursion Dynamic Driver, Dynamic Spatial A...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"Our Spatial Audio is more than just a virtual surround sound effect. It is a sophisticated system built on advanced acoustic principles and cutting-edge technology: * **Dynamic Head Tracking:** Integrated within the headphones are high-precision, multi-axis gyroscopes and acceler...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "50dB",
+            "50 dB"
+          ],
+          "命中": true,
+          "命中关键词": "50dB"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-max-master.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5534,
+      "usage_total_output": 162,
+      "usage_total_tokens": 5696,
+      "latency_ms": 11988.62
+    },
+    {
+      "id": "Q031",
+      "问题": "AE-Max-Master 的总续航时长是多少？",
+      "答案": "AE-Max-Master 的总续航时长是 **40hr**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"| Feature | Specification | | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | | **Audio Technology** | Custom 40mm High-Excursion Dynamic Driver, Dynamic Spatial A...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"* **Custom 40mm High-Excursion Drivers:** We developed a proprietary dynamic driver from the ground up. It features a rigid, yet lightweight, Beryllium-coated composite diaphragm that minimizes distortion and provides an exceptionally fast transient response. This results in incr...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "40小时",
+            "40 小时",
+            "40-hour",
+            "40 hours",
+            "40h"
+          ],
+          "命中": true,
+          "命中关键词": "40h"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-max-master.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5348,
+      "usage_total_output": 172,
+      "usage_total_tokens": 5520,
+      "latency_ms": 9539.71
+    },
+    {
+      "id": "Q032",
+      "问题": "AE-Max-Master 是否支持动态空间音频？",
+      "答案": "是，AE-Max-Master 支持动态空间音频。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"| Feature | Specification | | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | | **Audio Technology** | Custom 40mm High-Excursion Dynamic Driver, Dynamic Spatial A...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md`\n   证据片段: \"Our Spatial Audio is more than just a virtual surround sound effect. It is a sophisticated system built on advanced acoustic principles and cutting-edge technology: * **Dynamic Head Tracking:** Integrated within the headphones are high-precision, multi-axis gyroscopes and acceler...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "Dynamic Spatial Audio",
+            "Spatial Audio",
+            "空间音频"
+          ],
+          "命中": true,
+          "命中关键词": "Spatial Audio"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-max-master.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5532,
+      "usage_total_output": 201,
+      "usage_total_tokens": 5733,
+      "latency_ms": 14855.18
+    },
+    {
+      "id": "Q033",
+      "问题": "AE-Pro-Flagship 的官方售价是多少？",
+      "答案": "AE-Pro-Flagship 的官方售价是 **$1299**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"To achieve this class-leading level of noise reduction, we employ a sophisticated hybrid active noise cancellation (ANC) architecture. This dual-microphone system targets and neutralizes a much broader spectrum of frequencies than standard ANC implementations. * **Feedforward Mic...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"We understand that absolute silence isn't always the goal. The AE-Pro-Flagship offers a suite of modes, easily switchable through touch controls or the companion app, to give you complete control over your auditory world. * **Deep Mode:** This is the maximum 45dB noise cancellati...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "$1299",
+            "1299美元",
+            "1299"
+          ],
+          "命中": true,
+          "命中关键词": "$1299"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-pro-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5673,
+      "usage_total_output": 162,
+      "usage_total_tokens": 5835,
+      "latency_ms": 13137.91
+    },
+    {
+      "id": "Q034",
+      "问题": "AE-Pro-Flagship 的主动降噪深度是多少？",
+      "答案": "AE-Pro-Flagship 的主动降噪深度是 **45dB**。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"To achieve this class-leading level of noise reduction, we employ a sophisticated hybrid active noise cancellation (ANC) architecture. This dual-microphone system targets and neutralizes a much broader spectrum of frequencies than standard ANC implementations. * **Feedforward Mic...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"We understand that absolute silence isn't always the goal. The AE-Pro-Flagship offers a suite of modes, easily switchable through touch controls or the companion app, to give you complete control over your auditory world. * **Deep Mode:** This is the maximum 45dB noise cancellati...\"\n3. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"Our engineering team dedicated countless hours to perfecting the physical form of the AE-Lite-Lightweight. The effectiveness of passive noise reduction is entirely dependent on the quality of the seal between the earbud and the user's ear canal. To achieve a near-universal fit th...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "45dB",
+            "45 dB"
+          ],
+          "命中": true,
+          "命中关键词": "45dB"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md",
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-pro-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5616,
+      "usage_total_output": 178,
+      "usage_total_tokens": 5794,
+      "latency_ms": 22016.39
+    },
+    {
+      "id": "Q035",
+      "问题": "AE-Pro-Flagship 的蓝牙版本是什么？",
+      "答案": "AE-Pro-Flagship 的蓝牙版本是 Bluetooth 5.3。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"Bluetooth 5.3 introduces significant improvements to connection reliability. It is more adept at navigating crowded wireless environments, such as busy offices, airports, and gyms, where numerous Bluetooth devices are competing for bandwidth. By utilizing channel classification a...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"Step into the next era of shared audio experiences. The AE-Pro-Flagship is ready for Auracast™, a new Bluetooth capability that will enable public locations like airports, museums, and conference halls to broadcast audio directly to your earbuds. You'll be able to tune into silen...\"\n3. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md`\n   证据片段: \"In the world of wireless audio, the connection is everything. The AE-Lite-Lightweight is built upon the robust and mature Bluetooth 5.0 platform, a technology chosen specifically for its proven reliability, extended range, and exceptional power efficiency. This isn't just a speci...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "Bluetooth 5.3",
+            "蓝牙5.3",
+            "5.3"
+          ],
+          "命中": true,
+          "命中关键词": "Bluetooth 5.3"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md",
+        "Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-pro-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5370,
+      "usage_total_output": 156,
+      "usage_total_tokens": 5526,
+      "latency_ms": 8404.83
+    },
+    {
+      "id": "Q036",
+      "问题": "AE-Pro-Flagship 的总续航时长是多少？",
+      "答案": "AE-Pro-Flagship 的总续航时长是 30 小时。\n\n### 证据\n1. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"The AE-Pro-Flagship is built for the future, with full support for the next-generation LE Audio standard. At the heart of LE Audio is the new Low Complexity Communications Codec (LC3). This revolutionary codec offers a major upgrade over the standard SBC codec, providing signific...\"\n2. 来源文件: `Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md`\n   证据片段: \"| Feature | Specification | | ----------------------------- | --------------------------------------------------------------------------------------------------------- | | **Noise Cancellation** | Hybrid Active Noise Cancellation with AI Adaptive Algorithm | | **Noise Reduction D...\"\n3. 来源文件: `Product-Line-A-Smartwatch-Series/SW-1300-Youth.md`\n   证据片段: \"To achieve this level of endurance, the SW-1300-Youth employs a sophisticated power management system that optimizes energy consumption across hardware and software. * **Low-Power Core Processor:** The central processing unit is designed to operate in multiple power states. It us...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "30小时",
+            "30 小时",
+            "30-hour",
+            "30 hours",
+            "30h"
+          ],
+          "命中": true,
+          "命中关键词": "30小时"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"
+      ],
+      "引用证据文件": [
+        "Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md",
+        "Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "product-line-b-smart-earbuds-series/ae-pro-flagship.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5357,
+      "usage_total_output": 187,
+      "usage_total_tokens": 5544,
+      "latency_ms": 14634.13
+    },
+    {
+      "id": "Q037",
+      "问题": "CrystalVision 和我们合作了多少年？",
+      "答案": "CrystalVision 和我们合作了 8 年。\n\n### 证据\n1. 来源文件: `Supplier-Partnership-Records/Display-Supplier-CrystalVision.md`\n   证据片段: \"The AMOLED panels from CrystalVision form the visual centerpiece of our premium product tiers. These displays are renowned for their exceptional image quality, design flexibility, and power efficiency. * **Core Characteristics:** * **Contrast Ratio:** Due to their self-emissive n...\"\n2. 来源文件: `Supplier-Partnership-Records/Display-Supplier-CrystalVision.md`\n   证据片段: \"While AMOLEDs are used for our main product displays, we also source various other types of OLED panels from CrystalVision, often referred to as Passive-Matrix OLEDs (PMOLED) or smaller, simpler AMOLEDs for secondary functions. * **Distinction and Use Cases:** * Unlike AMOLEDs, w...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "8年",
+            "八年",
+            "eight years",
+            "8 years"
+          ],
+          "命中": true,
+          "命中关键词": "8年"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Supplier-Partnership-Records/Display-Supplier-CrystalVision.md"
+      ],
+      "引用证据文件": [
+        "Supplier-Partnership-Records/Display-Supplier-CrystalVision.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "supplier-partnership-records/display-supplier-crystalvision.md"
+      ],
+      "tool_call_rounds": 4,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections",
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 13337,
+      "usage_total_output": 310,
+      "usage_total_tokens": 13647,
+      "latency_ms": 12060.96
+    },
+    {
+      "id": "Q038",
+      "问题": "PowerCell 主要供应的电池类型是什么？",
+      "答案": "PowerCell 主要供应的是**锂聚合物电池**。\n\n### 证据\n1. 来源文件: `Supplier-Partnership-Records/Battery-Supplier-PowerCell.md`\n   证据片段: \"A multi-stage, joint quality assurance protocol is in place to guarantee that every battery meets our exacting standards. * **Supplier-Side Process Control:** We have visibility into PowerCell's manufacturing process, including their Statistical Process Control (SPC) data. They c...\"\n2. 来源文件: `Supplier-Partnership-Records/Battery-Supplier-PowerCell.md`\n   证据片段: \"Looking ahead, the partnership with PowerCell is poised to become even more critical as our product portfolio expands and technology evolves. Our long-term strategy is to continue deepening this collaboration. Key areas of focus for the future include: * **Exploring Next-Generati...\"\n3. 来源文件: `Supplier-Partnership-Records/Audio-Supplier-SoundTech.md`\n   证据片段: \"* **Description:** The S-DS100 is a versatile and cost-effective dynamic driver designed for applications requiring a balanced and clear audio output. It serves as the workhorse for a wide range of devices where reliable performance is paramount. * **Technical Specifications:** *...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "Lithium Polymer",
+            "Li-Po",
+            "锂聚合物",
+            "锂电池"
+          ],
+          "命中": true,
+          "命中关键词": "锂聚合物"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Supplier-Partnership-Records/Battery-Supplier-PowerCell.md"
+      ],
+      "引用证据文件": [
+        "Supplier-Partnership-Records/Battery-Supplier-PowerCell.md",
+        "Supplier-Partnership-Records/Audio-Supplier-SoundTech.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "supplier-partnership-records/battery-supplier-powercell.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5837,
+      "usage_total_output": 164,
+      "usage_total_tokens": 6001,
+      "latency_ms": 12093.52
+    },
+    {
+      "id": "Q039",
+      "问题": "UniChip 合作期是几年？",
+      "答案": "UniChip 合作期是 5 年。\n\n### 证据\n1. 来源文件: `Supplier-Partnership-Records/Chip-Supplier-UniChip.md`\n   证据片段: \"UniChip's competitive advantage is built upon several key technological pillars: * **Ultra-Low-Power Design:** UniChip is a pioneer in designing silicon that operates at minimal power levels. Their expertise spans from architectural design to physical implementation, employing te...\"\n2. 来源文件: `Supplier-Partnership-Records/Chip-Supplier-UniChip.md`\n   证据片段: \"This document provides a comprehensive overview of the strategic partnership established with UniChip Corporation, a premier semiconductor manufacturer. This collaboration is foundational to our product development and innovation strategy, securing a stable and advanced supply of...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "5年",
+            "五年",
+            "five years",
+            "5 years"
+          ],
+          "命中": true,
+          "命中关键词": "5年"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Supplier-Partnership-Records/Chip-Supplier-UniChip.md"
+      ],
+      "引用证据文件": [
+        "Supplier-Partnership-Records/Chip-Supplier-UniChip.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "supplier-partnership-records/chip-supplier-unichip.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5502,
+      "usage_total_output": 155,
+      "usage_total_tokens": 5657,
+      "latency_ms": 10235.49
+    },
+    {
+      "id": "Q040",
+      "问题": "SoundTech 的合作协议周期是几年？",
+      "答案": "SoundTech 的合作协议周期是 3 年。\n\n### 证据\n1. 来源文件: `Supplier-Partnership-Records/Audio-Supplier-SoundTech.md`\n   证据片段: \"SoundTech's competitive advantage stems from several key areas of expertise: * **Advanced Transducer Technology:** They possess deep knowledge in various transducer types, including dynamic drivers, balanced armatures, and piezoelectric speakers. Their research continually explor...\"\n2. 来源文件: `Supplier-Partnership-Records/Audio-Supplier-SoundTech.md`\n   证据片段: \"SoundTech Inc. is a globally recognized leader in the design, development, and manufacturing of micro-acoustic solutions. Founded on the principle of 'Acoustic Fidelity in Miniature Form,' the company has dedicated decades to perfecting the science of sound reproduction and captu...\"\n3. 来源文件: `2023-Market-Layout/East-China-Region.md`\n   证据片段: \"**1. Market Overview and Strategic Significance:** Shanghai, as a global financial hub and a trendsetter in consumer behavior, represents the most critical market within the East China Region. Its consumer base is characterized by high disposable income, a strong appetite for pre...\"",
+      "错误": "",
+      "判分关键词组结果": [
+        {
+          "关键词候选": [
+            "3年",
+            "三年",
+            "three years",
+            "3 years"
+          ],
+          "命中": true,
+          "命中关键词": "3年"
+        }
+      ],
+      "准确": true,
+      "期望证据文件": [
+        "Supplier-Partnership-Records/Audio-Supplier-SoundTech.md"
+      ],
+      "引用证据文件": [
+        "Supplier-Partnership-Records/Audio-Supplier-SoundTech.md",
+        "2023-Market-Layout/East-China-Region.md"
+      ],
+      "证据命中": true,
+      "命中证据文件(归一化)": [
+        "supplier-partnership-records/audio-supplier-soundtech.md"
+      ],
+      "tool_call_rounds": 2,
+      "tool_call_names": [
+        "search_paths",
+        "retrieve_sections"
+      ],
+      "usage_total_input": 5567,
+      "usage_total_output": 137,
+      "usage_total_tokens": 5704,
+      "latency_ms": 10881.88
+    }
+  ]
+}

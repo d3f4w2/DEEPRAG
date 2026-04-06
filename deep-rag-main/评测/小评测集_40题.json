@@ -1,0 +1,246 @@
+{
+  "版本": "v1.0",
+  "说明": "面试演示用小评测集（40题）。每题尽量单事实，便于快速看优化前后效果。",
+  "问题列表": [
+    {
+      "id": "Q001",
+      "问题": "SW-1300-Youth 的官方售价是多少？",
+      "判分关键词组": [["$599", "599美元", "599"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"]
+    },
+    {
+      "id": "Q002",
+      "问题": "SW-1300-Youth 的标准续航时长是多少？",
+      "判分关键词组": [["24小时", "24 小时", "24-hour", "24 hours", "24h"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"]
+    },
+    {
+      "id": "Q003",
+      "问题": "SW-1300-Youth 的防尘防水等级是什么？",
+      "判分关键词组": [["IP65"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"]
+    },
+    {
+      "id": "Q004",
+      "问题": "SW-1300-Youth 使用的屏幕类型是什么？",
+      "判分关键词组": [["OLED"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1300-Youth.md"]
+    },
+    {
+      "id": "Q005",
+      "问题": "SW-1500-Sport 的官方售价是多少？",
+      "判分关键词组": [["$999", "999美元", "999"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"]
+    },
+    {
+      "id": "Q006",
+      "问题": "SW-1500-Sport 的续航时长是多少？",
+      "判分关键词组": [["36小时", "36 小时", "36-hour", "36 hours", "36h"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"]
+    },
+    {
+      "id": "Q007",
+      "问题": "SW-1500-Sport 的防护等级是什么？",
+      "判分关键词组": [["IP68"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"]
+    },
+    {
+      "id": "Q008",
+      "问题": "SW-1500-Sport 的屏幕技术是什么？",
+      "判分关键词组": [["TFT"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1500-Sport.md"]
+    },
+    {
+      "id": "Q009",
+      "问题": "SW-1800-Business 的官方售价是多少？",
+      "判分关键词组": [["$1899", "1899美元", "1899"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1800-Business.md"]
+    },
+    {
+      "id": "Q010",
+      "问题": "SW-1800-Business 的续航时长是多少？",
+      "判分关键词组": [["48小时", "48 小时", "48-hour", "48 hours", "48h"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1800-Business.md"]
+    },
+    {
+      "id": "Q011",
+      "问题": "SW-1800-Business 的防护等级是什么？",
+      "判分关键词组": [["IP67"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1800-Business.md"]
+    },
+    {
+      "id": "Q012",
+      "问题": "SW-1800-Business 的显示类型是什么？",
+      "判分关键词组": [["LCD", "IPS"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-1800-Business.md"]
+    },
+    {
+      "id": "Q013",
+      "问题": "SW-2100-Flagship 的官方售价是多少？",
+      "判分关键词组": [["$2999", "2999美元", "2999"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"]
+    },
+    {
+      "id": "Q014",
+      "问题": "SW-2100-Flagship 的标准续航时长是多少？",
+      "判分关键词组": [["72小时", "72 小时", "72-hour", "72 hours", "72h"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"]
+    },
+    {
+      "id": "Q015",
+      "问题": "SW-2100-Flagship 的防护等级是什么？",
+      "判分关键词组": [["IP68"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"]
+    },
+    {
+      "id": "Q016",
+      "问题": "SW-2100-Flagship 支持哪两项核心健康监测：心电和血氧吗？请给出名称。",
+      "判分关键词组": [["ECG", "心电"], ["SpO2", "血氧"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md"]
+    },
+    {
+      "id": "Q017",
+      "问题": "SW-2200-Premium 的官方售价是多少？",
+      "判分关键词组": [["$4,999", "$4999", "4999美元", "4999"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"]
+    },
+    {
+      "id": "Q018",
+      "问题": "SW-2200-Premium 的标准续航时长是多少？",
+      "判分关键词组": [["96小时", "96 小时", "96-hour", "96 hours", "4 days", "4天"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"]
+    },
+    {
+      "id": "Q019",
+      "问题": "SW-2200-Premium 的防护等级是什么？",
+      "判分关键词组": [["IP69K"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"]
+    },
+    {
+      "id": "Q020",
+      "问题": "SW-2200-Premium 的屏幕技术名称是什么？",
+      "判分关键词组": [["Quantum Dot AMOLED Pro", "量子点AMOLED Pro", "AMOLED Pro"]],
+      "期望证据文件": ["Product-Line-A-Smartwatch-Series/SW-2200-Premium.md"]
+    },
+    {
+      "id": "Q021",
+      "问题": "AE-Lite-Lightweight 的官方售价是多少？",
+      "判分关键词组": [["$499", "499美元", "499"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"]
+    },
+    {
+      "id": "Q022",
+      "问题": "AE-Lite-Lightweight 的总续航时长是多少？",
+      "判分关键词组": [["18小时", "18 小时", "18-hour", "18 hours", "18h"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"]
+    },
+    {
+      "id": "Q023",
+      "问题": "AE-Lite-Lightweight 的被动降噪深度是多少？",
+      "判分关键词组": [["20dB", "20 dB"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"]
+    },
+    {
+      "id": "Q024",
+      "问题": "AE-Lite-Lightweight 使用的蓝牙版本是什么？",
+      "判分关键词组": [["Bluetooth 5.0", "蓝牙5.0", "5.0"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Lite-Lightweight.md"]
+    },
+    {
+      "id": "Q025",
+      "问题": "AE-Sport-Athletic 的官方售价是多少？",
+      "判分关键词组": [["$799", "799美元", "799"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"]
+    },
+    {
+      "id": "Q026",
+      "问题": "AE-Sport-Athletic 的核心听音技术是什么？",
+      "判分关键词组": [["骨传导", "Bone conduction", "bone conduction"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"]
+    },
+    {
+      "id": "Q027",
+      "问题": "AE-Sport-Athletic 的防水等级是什么？",
+      "判分关键词组": [["IPX7"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"]
+    },
+    {
+      "id": "Q028",
+      "问题": "AE-Sport-Athletic 的续航时长是多少？",
+      "判分关键词组": [["12小时", "12 小时", "12-hour", "12 hours", "12h"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Sport-Athletic.md"]
+    },
+    {
+      "id": "Q029",
+      "问题": "AE-Max-Master 的官方售价是多少？",
+      "判分关键词组": [["$1999", "1999美元", "1999"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"]
+    },
+    {
+      "id": "Q030",
+      "问题": "AE-Max-Master 的主动降噪深度是多少？",
+      "判分关键词组": [["50dB", "50 dB"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"]
+    },
+    {
+      "id": "Q031",
+      "问题": "AE-Max-Master 的总续航时长是多少？",
+      "判分关键词组": [["40小时", "40 小时", "40-hour", "40 hours", "40h"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"]
+    },
+    {
+      "id": "Q032",
+      "问题": "AE-Max-Master 是否支持动态空间音频？",
+      "判分关键词组": [["Dynamic Spatial Audio", "Spatial Audio", "空间音频"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Max-Master.md"]
+    },
+    {
+      "id": "Q033",
+      "问题": "AE-Pro-Flagship 的官方售价是多少？",
+      "判分关键词组": [["$1299", "1299美元", "1299"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"]
+    },
+    {
+      "id": "Q034",
+      "问题": "AE-Pro-Flagship 的主动降噪深度是多少？",
+      "判分关键词组": [["45dB", "45 dB"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"]
+    },
+    {
+      "id": "Q035",
+      "问题": "AE-Pro-Flagship 的蓝牙版本是什么？",
+      "判分关键词组": [["Bluetooth 5.3", "蓝牙5.3", "5.3"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"]
+    },
+    {
+      "id": "Q036",
+      "问题": "AE-Pro-Flagship 的总续航时长是多少？",
+      "判分关键词组": [["30小时", "30 小时", "30-hour", "30 hours", "30h"]],
+      "期望证据文件": ["Product-Line-B-Smart-Earbuds-Series/AE-Pro-Flagship.md"]
+    },
+    {
+      "id": "Q037",
+      "问题": "CrystalVision 和我们合作了多少年？",
+      "判分关键词组": [["8年", "八年", "eight years", "8 years"]],
+      "期望证据文件": ["Supplier-Partnership-Records/Display-Supplier-CrystalVision.md"]
+    },
+    {
+      "id": "Q038",
+      "问题": "PowerCell 主要供应的电池类型是什么？",
+      "判分关键词组": [["Lithium Polymer", "Li-Po", "锂聚合物", "锂电池"]],
+      "期望证据文件": ["Supplier-Partnership-Records/Battery-Supplier-PowerCell.md"]
+    },
+    {
+      "id": "Q039",
+      "问题": "UniChip 合作期是几年？",
+      "判分关键词组": [["5年", "五年", "five years", "5 years"]],
+      "期望证据文件": ["Supplier-Partnership-Records/Chip-Supplier-UniChip.md"]
+    },
+    {
+      "id": "Q040",
+      "问题": "SoundTech 的合作协议周期是几年？",
+      "判分关键词组": [["3年", "三年", "three years", "3 years"]],
+      "期望证据文件": ["Supplier-Partnership-Records/Audio-Supplier-SoundTech.md"]
+    }
+  ]
+}
