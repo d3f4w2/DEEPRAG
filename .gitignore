@@ -60,3 +60,4 @@ frontend.log
 *.log
 
 .vscode/
+.paddle_cache/

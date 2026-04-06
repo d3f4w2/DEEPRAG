@@ -1,5 +1,5 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Settings, FileCode, MessageSquare, BarChart3, Mic } from 'lucide-react';
+import { Send, Loader2, Settings, FileCode, MessageSquare, BarChart3, Mic, Image as ImageIcon } from 'lucide-react';
 import { chatApi } from './api';
 import type { Message, RetrievalJudge, StreamChunk } from './types';
 import ChatMessage from './components/ChatMessage';
@@ -8,13 +8,14 @@ import ConfigPanel from './components/ConfigPanel';
 import EvaluationPanel from './components/EvaluationPanel';
 import VoiceIngestionPanel from './components/VoiceIngestionPanel';
 import VoiceErrorBoundary from './components/VoiceErrorBoundary';
+import ImageIngestionPanel from './components/ImageIngestionPanel';
 import './App.css';
 
 const MAX_CONTEXT_MESSAGES = 12;
 const TOOL_STATUS_PREFIX = '[TOOL]';
 
 function App() {
-  const [activePage, setActivePage] = useState<'chat' | 'evaluation' | 'voice'>('chat');
+  const [activePage, setActivePage] = useState<'chat' | 'evaluation' | 'voice' | 'image'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -314,6 +315,14 @@ function App() {
                 <Mic size={16} />
                 <span>语音入库</span>
               </button>
+              <button
+                className={`nav-button ${activePage === 'image' ? 'active' : ''}`}
+                onClick={() => setActivePage('image')}
+                title="Image Ingestion"
+              >
+                <ImageIcon size={16} />
+                <span>图片入库</span>
+              </button>
             </div>
           </div>
           {activePage === 'chat' && (
@@ -435,11 +444,15 @@ function App() {
           <div className="chat-container">
             <EvaluationPanel />
           </div>
-        ) : (
+        ) : activePage === 'voice' ? (
           <div className="chat-container">
             <VoiceErrorBoundary>
               <VoiceIngestionPanel provider={selectedProvider} />
             </VoiceErrorBoundary>
+          </div>
+        ) : (
+          <div className="chat-container">
+            <ImageIngestionPanel provider={selectedProvider} />
           </div>
         )}
       </div>

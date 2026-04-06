@@ -11,15 +11,14 @@ import type {
   VoiceDraftResponse,
   VoiceIngestRequest,
   VoiceIngestResponse,
+  ImageDraftResponse,
+  ImageIngestResponse,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 export const chatApi = {
@@ -97,6 +96,18 @@ export const voiceApi = {
 
   ingest: async (request: VoiceIngestRequest): Promise<VoiceIngestResponse> => {
     const response = await api.post('/voice/ingest', request);
+    return response.data;
+  },
+};
+
+export const imageApi = {
+  draft: async (formData: FormData): Promise<ImageDraftResponse> => {
+    const response = await api.post('/image/draft', formData);
+    return response.data;
+  },
+
+  ingest: async (formData: FormData): Promise<ImageIngestResponse> => {
+    const response = await api.post('/image/ingest', formData);
     return response.data;
   },
 };

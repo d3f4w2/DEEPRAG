@@ -12,3 +12,9 @@ python-dotenv==1.0.0
 datasets>=2.16.0
 ragas>=0.4.3,<0.5.0
 langchain-openai>=0.3.0
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+paddleocr>=2.7.0
+# Install one Paddle runtime in your conda env:
+# paddlepaddle>=3.3.0        # CPU
+# paddlepaddle-gpu>=3.3.0    # GPU (match your CUDA)

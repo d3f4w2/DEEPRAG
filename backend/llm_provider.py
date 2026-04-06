@@ -1,4 +1,4 @@
-from typing import AsyncIterator, List, Dict, Optional
+from typing import Any, AsyncIterator, List, Dict, Optional
 import httpx
 import json
 import codecs
@@ -11,7 +11,7 @@ class LLMProvider:
     
     async def chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         tools: Optional[List[Dict]] = None,
         stream: bool = True
     ) -> AsyncIterator[str]:

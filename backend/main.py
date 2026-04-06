@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import json
 import os
+import mimetypes
 from pathlib import Path
 import signal
 import re
@@ -14,11 +15,18 @@ from backend.config import settings
 from backend.models import (
     ChatRequest, FileRetrievalRequest, FileRetrievalResponse,
     KnowledgeBaseInfo, HealthResponse, EvalStartRequest,
-    VoiceDraftRequest, VoiceDraftResponse, VoiceIngestRequest, VoiceIngestResponse
+    VoiceDraftRequest, VoiceDraftResponse, VoiceIngestRequest, VoiceIngestResponse,
+    ImageDraftResponse, ImageIngestResponse
 )
 from backend.knowledge_base import knowledge_base
 from backend.llm_provider import LLMProvider
 from backend.evaluation_manager import evaluation_manager
+from backend.image_processing import (
+    inspect_image_bytes,
+    parse_tags_text,
+    run_paddle_ocr,
+    run_vision_analysis,
+)
 from backend.prompts import (
     create_react_system_prompt,
     create_retrieve_sections_tool,
@@ -51,6 +59,10 @@ AUTO_RETRIEVAL_TOP_K_BOOST = 2
 MAX_FINAL_EVIDENCE_ITEMS = 3
 MAX_EVIDENCE_SNIPPET_LENGTH = 280
 VOICE_NOTES_DIR = "Voice-Notes"
+IMAGE_NOTES_DIR = "Image-Notes"
+IMAGE_ASSETS_DIR = "assets"
+MAX_IMAGE_UPLOAD_BYTES = int(os.getenv("MAX_IMAGE_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 FALLBACK_NO_EVIDENCE_ANSWER = (
     "我无法给出有证据支撑的回答。已自动再检索一轮，但仍未找到可引用片段。"
 )
@@ -178,6 +190,60 @@ def _safe_parse_tool_args(arguments: str) -> Dict[str, Any]:
     return _extract_json_object(arguments or "")
 
 
+async def _llm_expand_retrieval_query(provider: LLMProvider, user_query: str) -> Dict[str, Any]:
+    fallback = {
+        "expanded_query": (user_query or "").strip(),
+        "image_intent": False,
+        "hints": [],
+    }
+    query = (user_query or "").strip()
+    if not query:
+        return fallback
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You optimize retrieval queries for bilingual (Chinese/English) lexical search. "
+                "Return strict JSON only: "
+                "{\"expanded_query\": string, \"image_intent\": boolean, \"hints\": string[]}. "
+                "Rules: "
+                "1) Preserve original intent. "
+                "2) Add concise Chinese+English synonyms and key entities for retrieval. "
+                "3) If query is about image/photo/portrait/OCR/scene, set image_intent=true. "
+                "4) expanded_query should be one line."
+            ),
+        },
+        {"role": "user", "content": query},
+    ]
+
+    raw_text = ""
+    try:
+        async for chunk_str in provider.chat_completion(messages=messages, tools=None, stream=False):
+            chunk = json.loads(chunk_str)
+            if chunk.get("type") == "content":
+                raw_text += str(chunk.get("content") or "")
+    except Exception:
+        return fallback
+
+    parsed = _extract_json_object(raw_text)
+    expanded_query = _normalize_whitespace(str(parsed.get("expanded_query") or query))
+    image_intent = bool(parsed.get("image_intent"))
+    hints: List[str] = []
+    raw_hints = parsed.get("hints")
+    if isinstance(raw_hints, list):
+        for item in raw_hints:
+            hint = _normalize_whitespace(str(item))
+            if hint and hint not in hints:
+                hints.append(hint)
+
+    return {
+        "expanded_query": expanded_query or query,
+        "image_intent": image_intent,
+        "hints": hints[:16],
+    }
+
+
 def _slugify_filename(value: str, fallback: str = "speaker") -> str:
     cleaned = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", (value or "").strip(), flags=re.UNICODE)
     cleaned = cleaned.strip("_")
@@ -195,6 +261,29 @@ def _to_local_iso(raw_value: Optional[str]) -> str:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone().isoformat(timespec="seconds")
+
+
+def _guess_image_suffix(filename: str, content_type: str, image_format: str) -> str:
+    for candidate in [
+        Path(filename or "").suffix.lower(),
+        mimetypes.guess_extension(content_type or "") or "",
+        f".{(image_format or '').lower()}",
+    ]:
+        if candidate in ALLOWED_IMAGE_SUFFIXES:
+            return candidate
+    return ".png"
+
+
+async def _read_upload_image_bytes(file: UploadFile) -> bytes:
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Image file is empty.")
+    if len(image_bytes) > MAX_IMAGE_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image exceeds size limit ({MAX_IMAGE_UPLOAD_BYTES} bytes).",
+        )
+    return image_bytes
 
 
 def _fallback_voice_summary(transcript: str) -> str:
@@ -619,6 +708,159 @@ async def ingest_voice_note(request: VoiceIngestRequest):
         "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
     }
 
+
+@app.post("/image/draft", response_model=ImageDraftResponse)
+async def draft_image_note(
+    file: UploadFile = File(...),
+    author: str = Form(default="Unknown"),
+    source: str = Form(default="Image upload"),
+    provider: Optional[str] = Form(default=None),
+):
+    author_text = _normalize_whitespace(author or "Unknown")
+    source_text = _normalize_whitespace(source or "Image upload")
+
+    image_bytes = await _read_upload_image_bytes(file)
+    try:
+        width, height, image_format = inspect_image_bytes(image_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    image_content_type = (file.content_type or "").strip() or f"image/{image_format.lower()}"
+    image_suffix = _guess_image_suffix(file.filename or "", image_content_type, image_format)
+
+    try:
+        ocr_result = await run_paddle_ocr(image_bytes=image_bytes, suffix=image_suffix)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    provider_client = LLMProvider(provider=provider or settings.api_provider)
+    try:
+        vision_result = await run_vision_analysis(
+            provider=provider_client,
+            image_bytes=image_bytes,
+            content_type=image_content_type,
+            ocr_text=ocr_result.get("ocr_text", ""),
+            author=author_text,
+            source=source_text,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return {
+        "ocr_text": ocr_result.get("ocr_text", ""),
+        "visual_summary": vision_result.get("visual_summary", ""),
+        "visual_description": vision_result.get("visual_description", ""),
+        "tags": vision_result.get("tags", []),
+        "retrieval_keywords": vision_result.get("retrieval_keywords", []),
+        "ocr_line_count": int(ocr_result.get("ocr_line_count", 0)),
+        "image_width": width,
+        "image_height": height,
+    }
+
+
+@app.post("/image/ingest", response_model=ImageIngestResponse)
+async def ingest_image_note(
+    file: UploadFile = File(...),
+    visual_summary: str = Form(...),
+    visual_description: str = Form(...),
+    ocr_text: str = Form(default=""),
+    tags: str = Form(default=""),
+    retrieval_keywords: str = Form(default=""),
+    author: str = Form(default="Unknown"),
+    source: str = Form(default="Image upload"),
+    occurred_at: Optional[str] = Form(default=None),
+):
+    summary_text = (visual_summary or "").strip()
+    description_text = (visual_description or "").strip()
+    ocr_text_value = (ocr_text or "").strip()
+    author_text = (author or "Unknown").strip()
+    source_text = (source or "Image upload").strip()
+    tags_list = parse_tags_text(tags)
+    retrieval_keywords_list = parse_tags_text(retrieval_keywords)
+    if not retrieval_keywords_list:
+        retrieval_keywords_list = tags_list[:]
+
+    if not summary_text:
+        raise HTTPException(status_code=400, detail="visual_summary cannot be empty")
+    if not description_text:
+        raise HTTPException(status_code=400, detail="visual_description cannot be empty")
+
+    image_bytes = await _read_upload_image_bytes(file)
+    try:
+        width, height, image_format = inspect_image_bytes(image_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    image_content_type = (file.content_type or "").strip() or f"image/{image_format.lower()}"
+    image_suffix = _guess_image_suffix(file.filename or "", image_content_type, image_format)
+
+    occurred_local = _to_local_iso(occurred_at)
+    dt = datetime.fromisoformat(occurred_local)
+
+    kb_root = Path(settings.knowledge_base_chunks)
+    day_dir = kb_root / IMAGE_NOTES_DIR / dt.strftime("%Y-%m-%d")
+    assets_dir = day_dir / IMAGE_ASSETS_DIR
+    assets_dir.mkdir(parents=True, exist_ok=True)
+
+    slug = _slugify_filename(author_text, fallback="image")
+    base_name = f"{dt.strftime('%H%M%S')}_{slug}"
+    note_path = day_dir / f"{base_name}.md"
+    image_path = assets_dir / f"{base_name}{image_suffix}"
+    suffix_counter = 2
+    while note_path.exists() or image_path.exists():
+        note_path = day_dir / f"{base_name}_{suffix_counter}.md"
+        image_path = assets_dir / f"{base_name}_{suffix_counter}{image_suffix}"
+        suffix_counter += 1
+
+    image_path.write_bytes(image_bytes)
+    rel_image_path = str(image_path.relative_to(kb_root)).replace("\\", "/")
+
+    tags_text = ", ".join(tags_list) if tags_list else "(none)"
+    retrieval_keywords_text = (
+        ", ".join(retrieval_keywords_list) if retrieval_keywords_list else "(none)"
+    )
+    lines = [
+        "# Image Note",
+        "",
+        f"- Timestamp: `{occurred_local}`",
+        f"- Author: `{author_text}`",
+        f"- Source: `{source_text}`",
+        f"- Image: `{rel_image_path}`",
+        f"- Image Size: `{width}x{height}`",
+        f"- Summary: {summary_text}",
+        f"- Tags: {tags_text}",
+        f"- Retrieval Keywords: {retrieval_keywords_text}",
+        "",
+        "## Visual Description",
+        description_text,
+        "",
+        "## OCR Text",
+        ocr_text_value or "(No text detected by OCR.)",
+    ]
+    note_content = "\n".join(lines).strip() + "\n"
+    note_path.write_text(note_content, encoding="utf-8")
+
+    rel_note_path = str(note_path.relative_to(kb_root)).replace("\\", "/")
+    try:
+        ocr_excerpt = _normalize_whitespace(ocr_text_value)[:260]
+        desc_excerpt = _normalize_whitespace(description_text)[:260]
+        summary_index_text = (
+            f"{summary_text} | tags:{tags_text} | author:{author_text} | source:{source_text} "
+            f"| retrieval_keywords:{retrieval_keywords_text} | date:{dt.strftime('%Y-%m-%d')} "
+            f"| image:{rel_image_path} | desc:{desc_excerpt} "
+            f"| ocr:{ocr_excerpt}"
+        )
+        knowledge_base.update_summary_entry(rel_note_path, summary_index_text)
+    except Exception as e:
+        print(f"[WARN] Failed to update summary index for {rel_note_path}: {e}")
+
+    return {
+        "status": "ok",
+        "file_path": rel_note_path,
+        "image_path": rel_image_path,
+        "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    }
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
@@ -640,14 +882,25 @@ async def chat(request: ChatRequest):
             (msg.content for msg in reversed(request.messages) if msg.role == "user"),
             "",
         )
+        query_plan = await _llm_expand_retrieval_query(provider, latest_user_query)
+        retrieval_query = query_plan.get("expanded_query") or latest_user_query
+        hints = query_plan.get("hints") or []
+        if isinstance(hints, list) and hints:
+            retrieval_query = _normalize_whitespace(
+                f"{retrieval_query} {' '.join(str(h) for h in hints[:10])}"
+            )
         route_plan = await _plan_retrieval_route(provider, latest_user_query)
+        if query_plan.get("image_intent"):
+            route_plan["top_k"] = max(route_plan["top_k"], 8)
+            route_plan["min_file_paths"] = max(route_plan["min_file_paths"], 5)
+            route_plan["max_sections_per_file"] = max(route_plan["max_sections_per_file"], 2)
         
         if use_react:
             async def generate_response() -> AsyncIterator[str]:
                 async for chunk in handle_react_mode(
                     provider,
                     messages,
-                    user_query=latest_user_query,
+                    user_query=retrieval_query,
                     route_plan=route_plan,
                 ):
                     yield chunk
@@ -725,7 +978,7 @@ async def chat(request: ChatRequest):
                         accumulated_tool_call["function"]["name"] = "search_paths"
                         accumulated_tool_call["function"]["arguments"] = json.dumps(
                             {
-                                "query": latest_user_query,
+                                "query": retrieval_query,
                                 "top_k": route_plan["top_k"],
                             },
                             ensure_ascii=False,
@@ -738,7 +991,7 @@ async def chat(request: ChatRequest):
                         accumulated_tool_call["function"]["name"] = "search_paths"
                         accumulated_tool_call["function"]["arguments"] = json.dumps(
                             {
-                                "query": latest_user_query,
+                                "query": retrieval_query,
                                 "top_k": route_plan["top_k"],
                             },
                             ensure_ascii=False,
@@ -747,7 +1000,7 @@ async def chat(request: ChatRequest):
 
                     if tool_name == "search_paths":
                         args = _safe_parse_tool_args(accumulated_tool_call["function"].get("arguments", ""))
-                        query = args.get("query") or latest_user_query
+                        query = args.get("query") or retrieval_query
                         accumulated_tool_call["function"]["arguments"] = json.dumps(
                             {
                                 "query": query,
@@ -780,11 +1033,11 @@ async def chat(request: ChatRequest):
                             4,
                         )
                         max_sections = max(max_sections, route_plan["max_sections_per_file"])
-                        query = args.get("query") or latest_user_query
+                        query = args.get("query") or retrieval_query
                         accumulated_tool_call["function"]["arguments"] = json.dumps(
                             {
                                 "file_paths": file_paths,
-                                "query": query,
+                                "query": query or retrieval_query,
                                 "max_sections_per_file": max_sections,
                             },
                             ensure_ascii=False,
@@ -838,7 +1091,7 @@ async def chat(request: ChatRequest):
                         call_id=f"auto_search_{iteration}",
                         name="search_paths",
                         arguments={
-                            "query": latest_user_query,
+                            "query": retrieval_query,
                             "top_k": min(route_plan["top_k"] + AUTO_RETRIEVAL_TOP_K_BOOST, 10),
                         },
                     )
@@ -862,7 +1115,7 @@ async def chat(request: ChatRequest):
                             name="retrieve_sections",
                             arguments={
                                 "file_paths": retrieve_targets,
-                                "query": latest_user_query,
+                                "query": retrieval_query,
                                 "max_sections_per_file": min(
                                     route_plan["max_sections_per_file"] + 1,
                                     4,

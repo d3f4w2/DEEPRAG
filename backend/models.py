@@ -72,3 +72,21 @@ class VoiceIngestResponse(BaseModel):
     status: str
     file_path: str
     created_at: str
+
+
+class ImageDraftResponse(BaseModel):
+    ocr_text: str
+    visual_summary: str
+    visual_description: str
+    tags: List[str]
+    retrieval_keywords: List[str]
+    ocr_line_count: int
+    image_width: int
+    image_height: int
+
+
+class ImageIngestResponse(BaseModel):
+    status: str
+    file_path: str
+    image_path: str
+    created_at: str

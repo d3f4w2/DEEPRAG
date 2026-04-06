@@ -36,6 +36,24 @@ export interface VoiceIngestResponse {
   created_at: string;
 }
 
+export interface ImageDraftResponse {
+  ocr_text: string;
+  visual_summary: string;
+  visual_description: string;
+  tags: string[];
+  retrieval_keywords: string[];
+  ocr_line_count: number;
+  image_width: number;
+  image_height: number;
+}
+
+export interface ImageIngestResponse {
+  status: string;
+  file_path: string;
+  image_path: string;
+  created_at: string;
+}
+
 export interface Provider {
   id: string;
   name: string;
