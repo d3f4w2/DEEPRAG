@@ -206,6 +206,117 @@ def _fallback_voice_summary(transcript: str) -> str:
     return normalized[:60].rstrip() + "..."
 
 
+def _parse_voice_draft_response(raw_text: str) -> tuple[str, str, str]:
+    """Parse draft response from multiple possible formats.
+
+    Returns: (polished_text, summary, parse_note)
+    """
+    raw = (raw_text or "").strip()
+    if not raw:
+        return "", "", "empty response"
+
+    # 1) Direct JSON object.
+    parsed = _extract_json_object(raw)
+    polished = _normalize_whitespace(str(parsed.get("polished_text") or ""))
+    summary = _normalize_whitespace(str(parsed.get("summary") or ""))
+    if polished or summary:
+        return polished, summary, "json"
+
+    # 2) JSON inside fenced code block.
+    fence = re.search(r"```(?:json|JSON)?\s*([\s\S]*?)```", raw, flags=re.IGNORECASE)
+    if fence:
+        parsed = _extract_json_object(fence.group(1))
+        polished = _normalize_whitespace(str(parsed.get("polished_text") or ""))
+        summary = _normalize_whitespace(str(parsed.get("summary") or ""))
+        if polished or summary:
+            return polished, summary, "json-fence"
+
+    # 3) Tagged format.
+    tag_pol = re.search(r"<polished_text>\s*([\s\S]*?)\s*</polished_text>", raw, flags=re.IGNORECASE)
+    tag_sum = re.search(r"<summary>\s*([\s\S]*?)\s*</summary>", raw, flags=re.IGNORECASE)
+    polished = _normalize_whitespace(tag_pol.group(1) if tag_pol else "")
+    summary = _normalize_whitespace(tag_sum.group(1) if tag_sum else "")
+    if polished or summary:
+        return polished, summary, "xml-tags"
+
+    # 4) Label format: English.
+    m_en = re.search(
+        r"POLISHED_TEXT\s*[:：]\s*([\s\S]*?)(?:\n+\s*SUMMARY\s*[:：]\s*([\s\S]*))?$",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if m_en:
+        polished = _normalize_whitespace(m_en.group(1) or "")
+        summary = _normalize_whitespace(m_en.group(2) or "")
+        if polished or summary:
+            return polished, summary, "labels-en"
+
+    # 5) Label format: Chinese.
+    m_zh = re.search(
+        r"(?:润色文本|纠正文本|草稿)\s*[:：]\s*([\s\S]*?)(?:\n+\s*(?:摘要|总结)\s*[:：]\s*([\s\S]*))?$",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if m_zh:
+        polished = _normalize_whitespace(m_zh.group(1) or "")
+        summary = _normalize_whitespace(m_zh.group(2) or "")
+        if polished or summary:
+            return polished, summary, "labels-zh"
+
+    # 6) Free-form fallback: treat entire output as polished text.
+    stripped = re.sub(r"```[\s\S]*?```", "", raw).strip()
+    polished = _normalize_whitespace(stripped)
+    if polished:
+        return polished, "", "free-form"
+
+    return "", "", "unparsed"
+
+
+async def _llm_voice_summary(
+    provider: LLMProvider,
+    transcript: str,
+    polished_text: str,
+    author: str,
+) -> str:
+    summary_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Summarize the core meaning in ONE concise sentence. "
+                "Output plain text only. No markdown, no bullet points, no labels."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "author": author,
+                    "transcript": transcript,
+                    "polished_text": polished_text,
+                },
+                ensure_ascii=False,
+            ),
+        },
+    ]
+
+    raw = ""
+    try:
+        async for chunk_str in provider.chat_completion(
+            messages=summary_messages,
+            tools=None,
+            stream=False,
+        ):
+            chunk = json.loads(chunk_str)
+            if chunk.get("type") == "content":
+                raw += str(chunk.get("content") or "")
+    except Exception:
+        return ""
+
+    plain = _normalize_whitespace(raw)
+    plain = re.sub(r"^(?:summary|摘要|总结)\s*[:：]\s*", "", plain, flags=re.IGNORECASE)
+    return plain
+
+
 async def _llm_voice_draft(
     provider: LLMProvider,
     transcript: str,
@@ -218,8 +329,12 @@ async def _llm_voice_draft(
         {
             "role": "system",
             "content": (
-                "You are a voice note editor. Return strict JSON only with schema: "
-                "{\"polished_text\": string, \"summary\": string}. "
+                "You are a voice note editor. Rewrite colloquial transcript into clean readable text "
+                "without changing facts, then provide one-sentence summary. "
+                "Preferred output format (plain text, no markdown):\n"
+                "POLISHED_TEXT: <rewritten text>\n"
+                "SUMMARY: <one sentence>\n"
+                "If you return JSON, schema must be {\"polished_text\": string, \"summary\": string}. "
                 "Keep original facts, remove obvious fillers and disfluencies, and keep the same language "
                 "as transcript. Summary should express the core meaning in one concise sentence."
             ),
@@ -253,14 +368,19 @@ async def _llm_voice_draft(
             "warning": "LLM unavailable, returned fallback draft.",
         }
 
-    parsed = _extract_json_object(raw_text)
-    polished_text = _normalize_whitespace(str(parsed.get("polished_text") or ""))
-    summary = _normalize_whitespace(str(parsed.get("summary") or ""))
+    polished_text, summary, parse_note = _parse_voice_draft_response(raw_text)
 
     warning = ""
     if not polished_text:
         polished_text = fallback_polished
         warning = "LLM draft parse failed, used transcript directly."
+    if not summary:
+        summary = await _llm_voice_summary(
+            provider=provider,
+            transcript=transcript,
+            polished_text=polished_text,
+            author=author,
+        )
     if not summary:
         summary = _fallback_voice_summary(polished_text)
         warning = warning or "LLM summary parse failed, used heuristic summary."
