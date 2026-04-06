@@ -19,6 +19,13 @@ def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
 class EvaluationManager:
     def __init__(self) -> None:
         self.root_dir = Path(__file__).resolve().parent.parent
@@ -30,6 +37,10 @@ class EvaluationManager:
         self._jobs: Dict[str, Dict[str, Any]] = {}
         self._max_jobs = 50
         self._eval_module = self._load_eval_module()
+
+        self.min_faithfulness = float((settings.__dict__.get("eval_min_faithfulness") or 0.75))
+        self.min_context_recall = float((settings.__dict__.get("eval_min_context_recall") or 0.75))
+        self.min_answer_correctness = float((settings.__dict__.get("eval_min_answer_correctness") or 0.75))
 
     def _load_eval_module(self) -> Any:
         module_path = self.eval_dir / "运行小评测.py"
@@ -120,19 +131,29 @@ class EvaluationManager:
                 continue
 
             question_count = 0
+            dataset_type = "unknown"
             try:
                 payload = json.loads(file_path.read_text(encoding="utf-8"))
-                questions = payload.get("问题列表", [])
+                questions = payload.get("问题列表", []) if isinstance(payload, dict) else payload
                 if isinstance(questions, list):
                     question_count = len(questions)
+                    if questions:
+                        first = questions[0] if isinstance(questions[0], dict) else {}
+                        if isinstance(first, dict):
+                            if "参考答案" in first or "reference" in first:
+                                dataset_type = "ragas"
+                            elif "判分关键词组" in first:
+                                dataset_type = "legacy"
             except Exception:
                 question_count = 0
+                dataset_type = "invalid"
 
             datasets.append(
                 {
                     "name": file_path.name,
                     "path": self._to_rel_path(file_path),
                     "question_count": question_count,
+                    "dataset_type": dataset_type,
                     "updated_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(timespec="seconds"),
                 }
             )
@@ -156,8 +177,14 @@ class EvaluationManager:
             run_name = str(summary.get("run_name") or summary_path.name.replace("_汇总.json", ""))
             report_path = self.results_dir / f"{run_name}_报告.md"
             analysis_path = self.results_dir / f"{run_name}_复盘.md"
-
             metrics = summary.get("指标", {})
+
+            faithfulness = _safe_float(metrics.get("忠诚度", metrics.get("准确率", 0.0)))
+            context_recall = _safe_float(metrics.get("上下文召回率", metrics.get("证据命中率", 0.0)))
+            answer_correctness = _safe_float(metrics.get("答案准确度", metrics.get("准确率", 0.0)))
+            avg_token = _safe_float(metrics.get("平均token", 0.0))
+            avg_latency_ms = _safe_float(metrics.get("平均延迟_ms", 0.0))
+
             summaries.append(
                 {
                     "run_name": run_name,
@@ -165,10 +192,15 @@ class EvaluationManager:
                     "report_path": self._to_rel_path(report_path) if report_path.exists() else "",
                     "analysis_path": self._to_rel_path(analysis_path) if analysis_path.exists() else "",
                     "created_at": summary.get("created_at", ""),
-                    "accuracy": float(metrics.get("准确率", 0.0)),
-                    "evidence_hit_rate": float(metrics.get("证据命中率", 0.0)),
-                    "avg_token": float(metrics.get("平均token", 0.0)),
-                    "avg_latency_ms": float(metrics.get("平均延迟_ms", 0.0)),
+                    # 兼容老前端字段
+                    "accuracy": answer_correctness,
+                    "evidence_hit_rate": context_recall,
+                    # 新字段
+                    "faithfulness": faithfulness,
+                    "context_recall": context_recall,
+                    "answer_correctness": answer_correctness,
+                    "avg_token": avg_token,
+                    "avg_latency_ms": avg_latency_ms,
                 }
             )
         return summaries
@@ -239,21 +271,35 @@ class EvaluationManager:
     def _extract_failures(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         failures: List[Dict[str, Any]] = []
         for item in results:
-            accurate = bool(item.get("准确"))
-            evidence_hit = bool(item.get("证据命中"))
             error = str(item.get("错误") or "")
-            if accurate and evidence_hit and not error:
+            faith = to_float_local(item.get("忠诚度"))
+            recall = to_float_local(item.get("上下文召回率"))
+            correct = to_float_local(item.get("答案准确度"))
+
+            failed = bool(error)
+            if faith is None or recall is None or correct is None:
+                failed = True
+            if faith is not None and faith < self.min_faithfulness:
+                failed = True
+            if recall is not None and recall < self.min_context_recall:
+                failed = True
+            if correct is not None and correct < self.min_answer_correctness:
+                failed = True
+
+            if not failed:
                 continue
 
             failures.append(
                 {
                     "id": item.get("id", ""),
                     "问题": item.get("问题", ""),
-                    "准确": accurate,
-                    "证据命中": evidence_hit,
                     "错误": error,
+                    "忠诚度": faith,
+                    "上下文召回率": recall,
+                    "答案准确度": correct,
                     "期望证据文件": item.get("期望证据文件", []),
                     "引用证据文件": item.get("引用证据文件", []),
+                    "检索证据文件": item.get("检索证据文件", []),
                     "答案预览": str(item.get("答案", ""))[:400],
                 }
             )
@@ -262,11 +308,7 @@ class EvaluationManager:
     async def _llm_text(self, provider_name: Optional[str], messages: List[Dict[str, str]]) -> str:
         provider = LLMProvider(provider=provider_name or settings.api_provider)
         text = ""
-        async for chunk_str in provider.chat_completion(
-            messages=messages,
-            tools=None,
-            stream=False,
-        ):
+        async for chunk_str in provider.chat_completion(messages=messages, tools=None, stream=False):
             try:
                 chunk = json.loads(chunk_str)
             except Exception:
@@ -275,133 +317,34 @@ class EvaluationManager:
                 text += chunk.get("content", "")
         return text.strip()
 
-    async def _generate_llm_analysis_async(
+    def _generate_llm_analysis(
         self,
-        job_id: str,
         provider_name: Optional[str],
         summary: Dict[str, Any],
-        detail_payload: Dict[str, Any],
+        failures: List[Dict[str, Any]],
     ) -> str:
-        results = detail_payload.get("results", [])
-        if not isinstance(results, list):
-            results = []
-
-        chunk_size = 5
-        chunks: List[List[Dict[str, Any]]] = []
-        for i in range(0, len(results), chunk_size):
-            chunks.append(results[i : i + chunk_size])
-
-        if not chunks:
-            return "### 复盘结论\n\n本次评测没有可分析的数据。"
-
-        partial_findings: List[str] = []
-        total_chunks = len(chunks)
-        for idx, chunk in enumerate(chunks, start=1):
-            progress = 86.0 + (idx / max(total_chunks, 1)) * 10.0
-            self._update_job(
-                job_id,
-                status="running",
-                stage="analyzing",
-                progress_percent=round(min(progress, 96.0), 2),
-                current_question=f"LLM 复盘分块 {idx}/{total_chunks}",
-            )
-
-            chunk_payload = {
-                "chunk_index": idx,
-                "chunk_total": total_chunks,
-                "cases": chunk,
-            }
-            messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "你是 RAG 评测分析助手。你会收到评测明细文件的完整分块。"
-                        "请从当前分块中提取失败模式、可能根因、可执行改进建议。"
-                        "输出简洁 Markdown，小节为：失败项、疑似根因、改进建议。"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"评测汇总:\n{json.dumps(summary, ensure_ascii=False)}\n\n"
-                        f"评测明细分块:\n{json.dumps(chunk_payload, ensure_ascii=False)}"
-                    ),
-                },
-            ]
-            try:
-                partial = await self._llm_text(provider_name, messages)
-            except Exception as exc:
-                partial = f"分块 {idx} 分析失败: {exc}"
-            partial_findings.append(f"## 分块 {idx}\n\n{partial}")
-
-        final_messages = [
+        prompt_payload = {
+            "summary": summary,
+            "failure_count": len(failures),
+            "failures": failures[:12],
+        }
+        messages = [
             {
                 "role": "system",
                 "content": (
-                    "你是资深 RAG 架构师。请基于完整评测分块结论，输出一个可执行复盘报告。"
-                    "请输出 Markdown，结构固定为：\n"
-                    "1) 总体结论\n"
-                    "2) 关键问题（按影响排序）\n"
-                    "3) 根因分析\n"
-                    "4) 优化行动清单（P0/P1/P2，写预期改善指标）\n"
-                    "5) 下一轮评测建议（新增或改造题型）"
+                    "你是资深 RAG 评测分析助手。请基于输入的评测汇总和失败题，输出简洁、可执行的复盘报告。"
+                    "格式固定为 Markdown，包含：总体结论、主要问题（按影响排序）、优化动作（P0/P1/P2）、下一轮评测建议。"
                 ),
             },
             {
                 "role": "user",
-                "content": (
-                    f"评测汇总:\n{json.dumps(summary, ensure_ascii=False)}\n\n"
-                    "以下是基于完整评测明细文件逐块读取后的分析结果，请综合输出最终复盘报告：\n\n"
-                    + "\n\n".join(partial_findings)
-                ),
+                "content": json.dumps(prompt_payload, ensure_ascii=False),
             },
         ]
-
-        final_report = await self._llm_text(provider_name, final_messages)
-        if final_report.strip():
-            return final_report.strip()
-
-        failures = self._extract_failures(results)
-        if not failures:
-            return (
-                "### 总体结论\n\n"
-                "本轮评测未发现失败题，准确率和证据命中率均为 100%。\n\n"
-                "### 建议\n\n"
-                "1. 引入更复杂的多跳题，避免评测集过于简单。\n"
-                "2. 增加对歧义提问、否定问法和跨文档汇总题的覆盖。"
-            )
-
-        return (
-            "### 总体结论\n\n"
-            f"本轮存在 {len(failures)} 道失败题，建议优先检查检索召回与答案约束提示词。\n\n"
-            "### 立即动作\n\n"
-            "1. 对失败题逐条查看“期望证据文件 vs 引用证据文件”。\n"
-            "2. 针对高频失败模式补充检索路由规则。\n"
-            "3. 回归测试后再次运行同一评测集做对比。"
-        )
-
-    def _generate_llm_analysis(
-        self,
-        job_id: str,
-        provider_name: Optional[str],
-        summary: Dict[str, Any],
-        detail_payload: Dict[str, Any],
-    ) -> str:
         try:
-            return asyncio.run(
-                self._generate_llm_analysis_async(
-                    job_id=job_id,
-                    provider_name=provider_name,
-                    summary=summary,
-                    detail_payload=detail_payload,
-                )
-            )
+            return asyncio.run(self._llm_text(provider_name, messages))
         except Exception as exc:
-            return (
-                "### 复盘失败\n\n"
-                f"LLM 自动复盘过程出错：`{exc}`\n\n"
-                "建议先查看评测明细文件手动定位失败题。"
-            )
+            return f"### 复盘生成失败\n\n`{exc}`"
 
     def _run_job_thread(self, job_id: str) -> None:
         job = self.get_job(job_id)
@@ -432,17 +375,11 @@ class EvaluationManager:
             max_questions = int(job.get("max_questions") or 0)
             if max_questions > 0:
                 questions = questions[:max_questions]
-
             if not questions:
                 raise ValueError("评测集为空，无法运行。")
 
             total_questions = len(questions)
-            self._update_job(
-                job_id,
-                current_index=0,
-                current_total=total_questions,
-                current_question="准备开始评测",
-            )
+            self._update_job(job_id, current_index=0, current_total=total_questions, current_question="准备评测")
 
             def progress_callback(info: Dict[str, Any]) -> None:
                 current = int(info.get("current") or 0)
@@ -482,6 +419,7 @@ class EvaluationManager:
                 provider=(job.get("provider") or None),
                 dataset_path=dataset_path,
             )
+
             self._update_job(
                 job_id,
                 progress_percent=84.0,
@@ -501,14 +439,8 @@ class EvaluationManager:
             report_path = self.results_dir / f"{run_name}_报告.md"
             analysis_path = self.results_dir / f"{run_name}_复盘.md"
 
-            detail_path.write_text(
-                json.dumps(detail_payload, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            summary_path.write_text(
-                json.dumps(summary, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            detail_path.write_text(json.dumps(detail_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
             report_content = self._eval_module.build_markdown_report(
                 summary=summary,
@@ -517,32 +449,26 @@ class EvaluationManager:
                 compare_summary=compare_summary,
             )
 
+            failures = self._extract_failures(results)
             analysis_markdown = ""
             if bool(job.get("generate_analysis", True)):
                 self._update_job(
                     job_id,
                     status="running",
                     stage="analyzing",
-                    progress_percent=86.0,
+                    progress_percent=90.0,
                     current_question="正在生成 LLM 复盘报告",
                 )
                 analysis_markdown = self._generate_llm_analysis(
-                    job_id=job_id,
                     provider_name=(job.get("provider") or None),
                     summary=summary,
-                    detail_payload=detail_payload,
+                    failures=failures,
                 ).strip()
-
                 analysis_path.write_text(analysis_markdown, encoding="utf-8")
-                report_content = (
-                    report_content
-                    + "\n\n---\n\n## LLM 复盘报告\n\n"
-                    + analysis_markdown
-                )
+                report_content = report_content + "\n\n---\n\n## LLM 复盘报告\n\n" + analysis_markdown
 
             report_path.write_text(report_content, encoding="utf-8")
 
-            failures = self._extract_failures(results)
             outputs = {
                 "summary_path": self._to_rel_path(summary_path),
                 "detail_path": self._to_rel_path(detail_path),
@@ -577,6 +503,20 @@ class EvaluationManager:
                 error=error_text,
                 current_question="任务失败",
             )
+
+
+def to_float_local(value: Any) -> float | None:
+    try:
+        v = float(value)
+    except Exception:
+        return None
+    if math_is_nan_or_inf(v):
+        return None
+    return v
+
+
+def math_is_nan_or_inf(v: float) -> bool:
+    return v != v or v in (float("inf"), float("-inf"))
 
 
 evaluation_manager = EvaluationManager()

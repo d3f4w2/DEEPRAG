@@ -1,17 +1,20 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import signal
 import re
-from typing import Any, AsyncIterator, Dict, List
+from typing import Any, AsyncIterator, Dict, List, Optional
 from dotenv import load_dotenv, find_dotenv
 
 from backend.config import settings
 from backend.models import (
     ChatRequest, FileRetrievalRequest, FileRetrievalResponse,
-    KnowledgeBaseInfo, HealthResponse, EvalStartRequest
+    KnowledgeBaseInfo, HealthResponse, EvalStartRequest,
+    VoiceDraftRequest, VoiceDraftResponse, VoiceIngestRequest, VoiceIngestResponse
 )
 from backend.knowledge_base import knowledge_base
 from backend.llm_provider import LLMProvider
@@ -47,6 +50,7 @@ DEFAULT_ROUTE_PLAN = {
 AUTO_RETRIEVAL_TOP_K_BOOST = 2
 MAX_FINAL_EVIDENCE_ITEMS = 3
 MAX_EVIDENCE_SNIPPET_LENGTH = 280
+VOICE_NOTES_DIR = "Voice-Notes"
 FALLBACK_NO_EVIDENCE_ANSWER = (
     "我无法给出有证据支撑的回答。已自动再检索一轮，但仍未找到可引用片段。"
 )
@@ -172,6 +176,102 @@ def _coerce_int(value: Any, default: int, low: int, high: int) -> int:
 
 def _safe_parse_tool_args(arguments: str) -> Dict[str, Any]:
     return _extract_json_object(arguments or "")
+
+
+def _slugify_filename(value: str, fallback: str = "speaker") -> str:
+    cleaned = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", (value or "").strip(), flags=re.UNICODE)
+    cleaned = cleaned.strip("_")
+    return cleaned or fallback
+
+
+def _to_local_iso(raw_value: Optional[str]) -> str:
+    if not raw_value:
+        return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    raw = raw_value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except Exception:
+        return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone().isoformat(timespec="seconds")
+
+
+def _fallback_voice_summary(transcript: str) -> str:
+    normalized = _normalize_whitespace(transcript)
+    if not normalized:
+        return ""
+    if len(normalized) <= 60:
+        return normalized
+    return normalized[:60].rstrip() + "..."
+
+
+async def _llm_voice_draft(
+    provider: LLMProvider,
+    transcript: str,
+    author: str,
+) -> Dict[str, str]:
+    fallback_polished = _normalize_whitespace(transcript)
+    fallback_summary = _fallback_voice_summary(fallback_polished)
+
+    draft_messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a voice note editor. Return strict JSON only with schema: "
+                "{\"polished_text\": string, \"summary\": string}. "
+                "Keep original facts, remove obvious fillers and disfluencies, and keep the same language "
+                "as transcript. Summary should express the core meaning in one concise sentence."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "author": author,
+                    "transcript": transcript,
+                },
+                ensure_ascii=False,
+            ),
+        },
+    ]
+
+    raw_text = ""
+    try:
+        async for chunk_str in provider.chat_completion(
+            messages=draft_messages,
+            tools=None,
+            stream=False,
+        ):
+            chunk = json.loads(chunk_str)
+            if chunk.get("type") == "content":
+                raw_text += str(chunk.get("content") or "")
+    except Exception:
+        return {
+            "polished_text": fallback_polished,
+            "summary": fallback_summary,
+            "warning": "LLM unavailable, returned fallback draft.",
+        }
+
+    parsed = _extract_json_object(raw_text)
+    polished_text = _normalize_whitespace(str(parsed.get("polished_text") or ""))
+    summary = _normalize_whitespace(str(parsed.get("summary") or ""))
+
+    warning = ""
+    if not polished_text:
+        polished_text = fallback_polished
+        warning = "LLM draft parse failed, used transcript directly."
+    if not summary:
+        summary = _fallback_voice_summary(polished_text)
+        warning = warning or "LLM summary parse failed, used heuristic summary."
+
+    result = {
+        "polished_text": polished_text,
+        "summary": summary,
+    }
+    if warning:
+        result["warning"] = warning
+    return result
 
 
 async def _plan_retrieval_route(provider: LLMProvider, user_query: str) -> Dict[str, int]:
@@ -319,6 +419,85 @@ async def retrieve_files(request: FileRetrievalRequest):
         return {"content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/voice/draft", response_model=VoiceDraftResponse)
+async def draft_voice_note(request: VoiceDraftRequest):
+    transcript = _normalize_whitespace(request.transcript)
+    if not transcript:
+        raise HTTPException(status_code=400, detail="transcript cannot be empty")
+
+    author = _normalize_whitespace(request.author or "Unknown")
+    provider = LLMProvider(provider=request.provider or settings.api_provider)
+    draft = await _llm_voice_draft(provider=provider, transcript=transcript, author=author)
+
+    return {
+        "polished_text": draft.get("polished_text", transcript),
+        "summary": draft.get("summary", _fallback_voice_summary(transcript)),
+        "warning": draft.get("warning"),
+    }
+
+
+@app.post("/voice/ingest", response_model=VoiceIngestResponse)
+async def ingest_voice_note(request: VoiceIngestRequest):
+    transcript = (request.transcript or "").strip()
+    summary = (request.summary or "").strip()
+    author = (request.author or "Unknown").strip()
+    source = (request.source or "Realtime voice input").strip()
+
+    if not transcript:
+        raise HTTPException(status_code=400, detail="transcript cannot be empty")
+    if not summary:
+        raise HTTPException(status_code=400, detail="summary cannot be empty")
+
+    occurred_at = _to_local_iso(request.occurred_at)
+    dt = datetime.fromisoformat(occurred_at)
+
+    voice_dir = Path(settings.knowledge_base_chunks) / VOICE_NOTES_DIR / dt.strftime("%Y-%m-%d")
+    voice_dir.mkdir(parents=True, exist_ok=True)
+
+    slug = _slugify_filename(author, fallback="speaker")
+    base_name = f"{dt.strftime('%H%M%S')}_{slug}"
+    target_file = voice_dir / f"{base_name}.md"
+    suffix = 2
+    while target_file.exists():
+        target_file = voice_dir / f"{base_name}_{suffix}.md"
+        suffix += 1
+
+    raw_transcript = (request.raw_transcript or "").strip()
+    lines = [
+        "# Voice Note",
+        "",
+        f"- Timestamp: `{occurred_at}`",
+        f"- Author: `{author}`",
+        f"- Source: `{source}`",
+        f"- Summary: {summary}",
+        "",
+        "## Corrected Transcript",
+        transcript,
+    ]
+    if raw_transcript:
+        lines.extend(["", "## Raw Transcript", raw_transcript])
+
+    content = "\n".join(lines).strip() + "\n"
+    target_file.write_text(content, encoding="utf-8")
+
+    rel_path = str(target_file.relative_to(Path(settings.knowledge_base_chunks))).replace("\\", "/")
+    try:
+        transcript_excerpt = _normalize_whitespace(transcript)[:240]
+        summary_index_text = (
+            f"{summary} | author:{author} | source:{source} | date:{dt.strftime('%Y-%m-%d')} "
+            f"| content:{transcript_excerpt}"
+        )
+        knowledge_base.update_summary_entry(rel_path, summary_index_text)
+    except Exception as e:
+        print(f"[WARN] Failed to update summary index for {rel_path}: {e}")
+
+    return {
+        "status": "ok",
+        "file_path": rel_path,
+        "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    }
 
 @app.post("/chat")
 async def chat(request: ChatRequest):

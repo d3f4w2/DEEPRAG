@@ -7,9 +7,33 @@ export interface ChatRequest {
   messages: Message[];
   provider?: string;
   model?: string;
-  // Note: temperature, max_tokens, stream have been removed
-  // temperature and max_tokens can only be set through global configuration in backend .env file
-  // stream is forced to true and cannot be modified
+}
+
+export interface VoiceDraftRequest {
+  transcript: string;
+  author?: string;
+  provider?: string;
+}
+
+export interface VoiceDraftResponse {
+  polished_text: string;
+  summary: string;
+  warning?: string;
+}
+
+export interface VoiceIngestRequest {
+  transcript: string;
+  summary: string;
+  author: string;
+  source: string;
+  occurred_at?: string;
+  raw_transcript?: string;
+}
+
+export interface VoiceIngestResponse {
+  status: string;
+  file_path: string;
+  created_at: string;
 }
 
 export interface Provider {
@@ -64,6 +88,7 @@ export interface EvaluationDataset {
   name: string;
   path: string;
   question_count: number;
+  dataset_type?: string;
   updated_at: string;
 }
 
@@ -75,6 +100,9 @@ export interface EvaluationSummaryItem {
   created_at: string;
   accuracy: number;
   evidence_hit_rate: number;
+  faithfulness?: number;
+  context_recall?: number;
+  answer_correctness?: number;
   avg_token: number;
   avg_latency_ms: number;
 }
@@ -92,13 +120,16 @@ export interface EvaluationStartRequest {
 
 export interface EvaluationFailureItem {
   id: string;
-  问题: string;
-  准确: boolean;
-  证据命中: boolean;
-  错误: string;
-  期望证据文件: string[];
-  引用证据文件: string[];
-  答案预览: string;
+  问题?: string;
+  错误?: string;
+  忠诚度?: number | null;
+  上下文召回率?: number | null;
+  答案准确度?: number | null;
+  期望证据文件?: string[];
+  引用证据文件?: string[];
+  检索证据文件?: string[];
+  答案预览?: string;
+  [key: string]: unknown;
 }
 
 export interface EvaluationJob {

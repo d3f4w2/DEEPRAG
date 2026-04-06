@@ -2,7 +2,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import aiofiles
 
@@ -89,6 +89,30 @@ class KnowledgeBase:
 
         self._summary_index_cache = entries
         return entries
+
+    def update_summary_entry(self, relative_path: str, summary: str) -> None:
+        """Update or create one path entry in summary_demo.json for searchable ingestion."""
+        path_key = (relative_path or "").strip().replace("\\", "/").lstrip("/")
+        if not path_key:
+            return
+
+        payload: Dict[str, Any] = {}
+        if self.summary_json_file.exists():
+            try:
+                with open(self.summary_json_file, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+                if isinstance(existing, dict):
+                    payload = existing
+            except Exception as e:
+                print(f"[WARN] Failed to load summary index for update: {e}")
+
+        payload[path_key] = (summary or "").strip()
+        self.summary_json_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.summary_json_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+        # Force reload on next search_paths call.
+        self._summary_index_cache = None
 
     async def search_paths(self, query: str, top_k: int = 5) -> str:
         entries = self._load_summary_index()

@@ -48,6 +48,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function getMetric(metrics: Record<string, number>, key: string, fallback = 0): number {
+  const value = metrics[key];
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  return fallback;
+}
+
 const EvaluationPanel: React.FC = () => {
   const [datasets, setDatasets] = useState<EvaluationDataset[]>([]);
   const [summaries, setSummaries] = useState<EvaluationSummaryItem[]>([]);
@@ -95,7 +101,7 @@ const EvaluationPanel: React.FC = () => {
         setActiveJobId((jobsRes.jobs || [])[0].job_id);
       }
     } catch (e: unknown) {
-      setError(getErrorMessage(e, '加载测评数据失败'));
+      setError(getErrorMessage(e, '加载评测数据失败'));
     } finally {
       setLoading(false);
     }
@@ -134,7 +140,7 @@ const EvaluationPanel: React.FC = () => {
           setSummaries(summaryRes.summaries || []);
         }
       } catch {
-        // Keep polling silently.
+        // keep polling silently
       }
     };
 
@@ -191,6 +197,12 @@ const EvaluationPanel: React.FC = () => {
   const metrics = ((activeJob?.summary as { 指标?: Record<string, number> } | undefined)?.指标) || {};
   const failures = (activeJob?.failures || []) as EvaluationFailureItem[];
 
+  const faithfulness = getMetric(metrics, '忠诚度', getMetric(metrics, '准确率'));
+  const contextRecall = getMetric(metrics, '上下文召回率', getMetric(metrics, '证据命中率'));
+  const answerCorrectness = getMetric(metrics, '答案准确度', getMetric(metrics, '准确率'));
+  const avgToken = getMetric(metrics, '平均token');
+  const avgLatency = getMetric(metrics, '平均延迟_ms');
+
   return (
     <div className="evaluation-panel">
       <div className="evaluation-toolbar">
@@ -217,7 +229,7 @@ const EvaluationPanel: React.FC = () => {
               <select value={selectedDataset} onChange={(e) => setSelectedDataset(e.target.value)}>
                 {datasets.map((ds) => (
                   <option key={ds.path} value={ds.path}>
-                    {ds.name} ({ds.question_count} 题)
+                    {ds.name} ({ds.question_count} 题{ds.dataset_type ? `, ${ds.dataset_type}` : ''})
                   </option>
                 ))}
               </select>
@@ -294,7 +306,7 @@ const EvaluationPanel: React.FC = () => {
                 disabled={!selectedDataset || starting}
               >
                 {starting ? <Loader2 className="spinner" size={16} /> : <Play size={16} />}
-                一键测评
+                一键评测
               </button>
             </>
           )}
@@ -303,7 +315,7 @@ const EvaluationPanel: React.FC = () => {
         <section className="panel-card">
           <h3>任务进度</h3>
           {!activeJob ? (
-            <div className="empty-state">暂无任务，点击左侧“一键测评”开始。</div>
+            <div className="empty-state">暂无任务，点击左侧“一键评测”开始。</div>
           ) : (
             <div className="job-status">
               <div className="job-head">
@@ -348,23 +360,27 @@ const EvaluationPanel: React.FC = () => {
       {activeJob && activeJob.status === 'completed' && (
         <>
           <section className="panel-card metrics-card">
-            <h3>四项核心指标</h3>
+            <h3>核心指标（RAGAS + 性能）</h3>
             <div className="metrics-grid">
               <div className="metric-item">
-                <span>准确率</span>
-                <strong>{toPercent(metrics['准确率'])}</strong>
+                <span>忠诚度</span>
+                <strong>{toPercent(faithfulness)}</strong>
               </div>
               <div className="metric-item">
-                <span>证据命中率</span>
-                <strong>{toPercent(metrics['证据命中率'])}</strong>
+                <span>上下文召回率</span>
+                <strong>{toPercent(contextRecall)}</strong>
+              </div>
+              <div className="metric-item">
+                <span>答案准确度</span>
+                <strong>{toPercent(answerCorrectness)}</strong>
               </div>
               <div className="metric-item">
                 <span>平均 token</span>
-                <strong>{toNumber(metrics['平均token'])}</strong>
+                <strong>{toNumber(avgToken)}</strong>
               </div>
               <div className="metric-item">
                 <span>平均延迟</span>
-                <strong>{toNumber(metrics['平均延迟_ms'])} ms</strong>
+                <strong>{toNumber(avgLatency)} ms</strong>
               </div>
             </div>
             <div className="artifact-list">
@@ -385,18 +401,17 @@ const EvaluationPanel: React.FC = () => {
                   <div key={f.id} className="failure-item">
                     <div className="failure-head">
                       <strong>{f.id}</strong>
-                      <span className={f.准确 && f.证据命中 ? 'ok' : 'bad'}>
-                        准确:{String(f.准确)} / 证据:{String(f.证据命中)}
+                      <span className="bad">
+                        忠诚度: {toPercent(typeof f.忠诚度 === 'number' ? f.忠诚度 : undefined)} / 召回率:{' '}
+                        {toPercent(typeof f.上下文召回率 === 'number' ? f.上下文召回率 : undefined)} / 准确度:{' '}
+                        {toPercent(typeof f.答案准确度 === 'number' ? f.答案准确度 : undefined)}
                       </span>
                     </div>
-                    <div className="failure-question">{f.问题}</div>
+                    <div className="failure-question">{f.问题 || '--'}</div>
                     {f.错误 && <div className="failure-error">{f.错误}</div>}
-                    <div className="failure-meta">
-                      期望证据: {f.期望证据文件?.join(', ') || '--'}
-                    </div>
-                    <div className="failure-meta">
-                      实际证据: {f.引用证据文件?.join(', ') || '--'}
-                    </div>
+                    <div className="failure-meta">期望证据: {(f.期望证据文件 || []).join(', ') || '--'}</div>
+                    <div className="failure-meta">回答引用: {(f.引用证据文件 || []).join(', ') || '--'}</div>
+                    <div className="failure-meta">检索命中: {(f.检索证据文件 || []).join(', ') || '--'}</div>
                     <div className="failure-preview">{f.答案预览 || '--'}</div>
                   </div>
                 ))}
@@ -418,7 +433,7 @@ const EvaluationPanel: React.FC = () => {
           </section>
 
           <section className="panel-card">
-            <h3>完整测评报告</h3>
+            <h3>完整评测报告</h3>
             {activeJob.report_markdown ? (
               <div className="markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -445,8 +460,9 @@ const EvaluationPanel: React.FC = () => {
                   <span>{s.created_at ? new Date(s.created_at).toLocaleString() : '--'}</span>
                 </div>
                 <div className="history-metrics">
-                  <span>准确率: {toPercent(s.accuracy)}</span>
-                  <span>证据: {toPercent(s.evidence_hit_rate)}</span>
+                  <span>忠诚度: {toPercent(s.faithfulness)}</span>
+                  <span>召回率: {toPercent(s.context_recall ?? s.evidence_hit_rate)}</span>
+                  <span>准确度: {toPercent(s.answer_correctness ?? s.accuracy)}</span>
                   <span>token: {toNumber(s.avg_token)}</span>
                   <span>延迟: {toNumber(s.avg_latency_ms)}ms</span>
                 </div>

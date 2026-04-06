@@ -45,3 +45,30 @@ class EvalStartRequest(BaseModel):
     timeout_sec: float = 180.0
     generate_analysis: bool = True
     base_url: Optional[str] = None
+
+
+class VoiceDraftRequest(BaseModel):
+    transcript: str
+    author: Optional[str] = None
+    provider: Optional[str] = None
+
+
+class VoiceDraftResponse(BaseModel):
+    polished_text: str
+    summary: str
+    warning: Optional[str] = None
+
+
+class VoiceIngestRequest(BaseModel):
+    transcript: str
+    summary: str
+    author: str = Field(default="Unknown")
+    source: str = Field(default="Realtime voice input")
+    occurred_at: Optional[str] = None
+    raw_transcript: Optional[str] = None
+
+
+class VoiceIngestResponse(BaseModel):
+    status: str
+    file_path: str
+    created_at: str

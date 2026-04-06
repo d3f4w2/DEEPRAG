@@ -7,6 +7,10 @@ import type {
   EvaluationSummaryItem,
   EvaluationStartRequest,
   EvaluationJob,
+  VoiceDraftRequest,
+  VoiceDraftResponse,
+  VoiceIngestRequest,
+  VoiceIngestResponse,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -81,6 +85,18 @@ export const evaluationApi = {
 
   startJob: async (request: EvaluationStartRequest): Promise<EvaluationJob> => {
     const response = await api.post('/evaluation/jobs/start', request);
+    return response.data;
+  },
+};
+
+export const voiceApi = {
+  draft: async (request: VoiceDraftRequest): Promise<VoiceDraftResponse> => {
+    const response = await api.post('/voice/draft', request);
+    return response.data;
+  },
+
+  ingest: async (request: VoiceIngestRequest): Promise<VoiceIngestResponse> => {
+    const response = await api.post('/voice/ingest', request);
     return response.data;
   },
 };

@@ -1,18 +1,20 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Settings, FileCode, MessageSquare, BarChart3 } from 'lucide-react';
+import { Send, Loader2, Settings, FileCode, MessageSquare, BarChart3, Mic } from 'lucide-react';
 import { chatApi } from './api';
 import type { Message, RetrievalJudge, StreamChunk } from './types';
 import ChatMessage from './components/ChatMessage';
 import SystemPromptPanel from './components/SystemPromptPanel';
 import ConfigPanel from './components/ConfigPanel';
 import EvaluationPanel from './components/EvaluationPanel';
+import VoiceIngestionPanel from './components/VoiceIngestionPanel';
+import VoiceErrorBoundary from './components/VoiceErrorBoundary';
 import './App.css';
 
 const MAX_CONTEXT_MESSAGES = 12;
 const TOOL_STATUS_PREFIX = '[TOOL]';
 
 function App() {
-  const [activePage, setActivePage] = useState<'chat' | 'evaluation'>('chat');
+  const [activePage, setActivePage] = useState<'chat' | 'evaluation' | 'voice'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -304,6 +306,14 @@ function App() {
                 <BarChart3 size={16} />
                 <span>测评</span>
               </button>
+              <button
+                className={`nav-button ${activePage === 'voice' ? 'active' : ''}`}
+                onClick={() => setActivePage('voice')}
+                title="Voice Ingestion"
+              >
+                <Mic size={16} />
+                <span>语音入库</span>
+              </button>
             </div>
           </div>
           {activePage === 'chat' && (
@@ -421,9 +431,15 @@ function App() {
               </div>
             </div>
           </>
-        ) : (
+        ) : activePage === 'evaluation' ? (
           <div className="chat-container">
             <EvaluationPanel />
+          </div>
+        ) : (
+          <div className="chat-container">
+            <VoiceErrorBoundary>
+              <VoiceIngestionPanel provider={selectedProvider} />
+            </VoiceErrorBoundary>
           </div>
         )}
       </div>

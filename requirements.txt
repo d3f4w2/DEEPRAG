@@ -9,3 +9,6 @@ openai==1.10.0
 anthropic==0.18.0
 google-generativeai==0.3.2
 python-dotenv==1.0.0
+datasets>=2.16.0
+ragas>=0.4.3,<0.5.0
+langchain-openai>=0.3.0
