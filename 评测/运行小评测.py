@@ -22,6 +22,7 @@ from ragas.llms import LangchainLLMWrapper
 from ragas.metrics._answer_correctness import AnswerCorrectness
 from ragas.metrics._context_recall import ContextRecall
 from ragas.metrics._faithfulness import Faithfulness
+from ragas.run_config import RunConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -39,6 +40,8 @@ SOURCE_PATTERNS = [
     re.compile(r"source\s*file\s*:\s*`([^`]+)`", re.IGNORECASE),
 ]
 BACKTICK_MD_PATTERN = re.compile(r"`([^`]+?\.md)`", re.IGNORECASE)
+RAGAS_MAX_WORKERS = max(1, min(int(os.getenv("RAGAS_MAX_WORKERS", "4")), 16))
+RAGAS_TIMEOUT_SEC = max(30, min(int(os.getenv("RAGAS_TIMEOUT_SEC", "180")), 600))
 
 
 def normalize_text(text: str) -> str:
@@ -256,6 +259,10 @@ def stream_chat_once(
                     for tool_result in results:
                         tool_call_id = str(tool_result.get("tool_call_id") or "").strip()
                         tool_name = tool_call_id_to_name.get(tool_call_id, "")
+                        if not tool_name:
+                            meta = tool_result.get("meta", {})
+                            if isinstance(meta, dict):
+                                tool_name = str(meta.get("tool_name") or "").strip()
                         content = str(tool_result.get("content") or "")
                         if not content:
                             continue
@@ -293,46 +300,77 @@ def stream_chat_once(
 
 
 def build_ragas_wrappers(provider_name: str | None) -> tuple[LangchainLLMWrapper, LangchainEmbeddingsWrapper, dict[str, str]]:
-    provider = (provider_name or settings.api_provider).strip()
-    provider_cfg = settings.get_provider_config(provider)
+    judge_provider = (provider_name or settings.api_provider).strip()
+    judge_cfg = settings.get_provider_config(judge_provider)
 
-    api_key = str(provider_cfg.get("api_key") or "").strip()
-    base_url = str(provider_cfg.get("base_url") or "").strip() or None
-    model = str(provider_cfg.get("model") or "").strip()
+    ragas_embedding_provider = os.getenv("RAGAS_EMBEDDING_PROVIDER", "").strip()
+    if not ragas_embedding_provider:
+        ragas_embedding_provider = (
+            "ragas_embedding"
+            if settings.get_provider_config("ragas_embedding").get("model")
+            else judge_provider
+        )
+    embedding_cfg = settings.get_provider_config(ragas_embedding_provider)
 
-    if not api_key:
-        raise ValueError(f"缺少 {provider.upper()}_API_KEY，无法执行 RAGAS 评分。")
-    if not model:
-        raise ValueError(f"缺少 {provider.upper()}_MODEL，无法执行 RAGAS 评分。")
+    judge_api_key = str(judge_cfg.get("api_key") or "").strip()
+    judge_base_url = str(judge_cfg.get("base_url") or "").strip() or None
+    judge_model = str(judge_cfg.get("model") or "").strip()
+    judge_headers = judge_cfg.get("headers") if isinstance(judge_cfg.get("headers"), dict) else None
 
+    if not judge_api_key:
+        raise ValueError(f"缺少 {judge_provider.upper()}_API_KEY，无法执行 RAGAS 评分。")
+    if not judge_model:
+        raise ValueError(f"缺少 {judge_provider.upper()}_MODEL，无法执行 RAGAS 评分。")
+
+    embedding_api_key = str(embedding_cfg.get("api_key") or "").strip()
+    embedding_base_url = str(embedding_cfg.get("base_url") or "").strip() or judge_base_url
+    embedding_headers = (
+        embedding_cfg.get("headers") if isinstance(embedding_cfg.get("headers"), dict) else None
+    )
     embedding_model = (
-        os.getenv(f"{provider.upper()}_EMBEDDING_MODEL")
+        os.getenv(f"{ragas_embedding_provider.upper()}_EMBEDDING_MODEL")
         or os.getenv("RAGAS_EMBEDDING_MODEL")
+        or os.getenv(f"{ragas_embedding_provider.upper()}_MODEL")
+        or str(embedding_cfg.get("model") or "").strip()
         or "text-embedding-3-small"
     ).strip()
+
+    if not embedding_api_key:
+        raise ValueError(
+            f"缺少 {ragas_embedding_provider.upper()}_API_KEY，无法执行 RAGAS embedding 评分。"
+        )
     if not embedding_model:
         raise ValueError("未设置 embedding model，无法执行 RAGAS 评分。")
 
     llm = ChatOpenAI(
-        model=model,
-        api_key=api_key,
-        base_url=base_url,
+        model=judge_model,
+        api_key=judge_api_key,
+        base_url=judge_base_url,
+        default_headers=judge_headers,
+        timeout=RAGAS_TIMEOUT_SEC,
+        max_retries=2,
         temperature=0.0,
+        use_responses_api=False,
     )
     embeddings = OpenAIEmbeddings(
         model=embedding_model,
-        api_key=api_key,
-        base_url=base_url,
+        api_key=embedding_api_key,
+        base_url=embedding_base_url,
+        default_headers=embedding_headers,
+        timeout=RAGAS_TIMEOUT_SEC,
+        max_retries=2,
     )
 
     return (
         LangchainLLMWrapper(llm),
         LangchainEmbeddingsWrapper(embeddings),
         {
-            "judge_provider": provider,
-            "judge_model": model,
+            "judge_provider": judge_provider,
+            "judge_model": judge_model,
+            "embedding_provider": ragas_embedding_provider,
             "embedding_model": embedding_model,
-            "judge_base_url": base_url or "",
+            "judge_base_url": judge_base_url or "",
+            "embedding_base_url": embedding_base_url or "",
         },
     )
 
@@ -389,11 +427,18 @@ def apply_ragas_scores(
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=DeprecationWarning)
+        run_config = RunConfig(
+            timeout=RAGAS_TIMEOUT_SEC,
+            max_retries=3,
+            max_wait=60,
+            max_workers=RAGAS_MAX_WORKERS,
+        )
         ragas_result = evaluate(
             dataset=HFDataset.from_list(ragas_rows),
             metrics=metrics,
             llm=llm_wrapper,
             embeddings=emb_wrapper,
+            run_config=run_config,
             raise_exceptions=False,
             show_progress=False,
         )

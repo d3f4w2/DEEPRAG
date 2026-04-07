@@ -84,6 +84,74 @@ Deep RAG 提供：
 - 🔧 **便捷配置**：基于 Web 的 .env 编辑器
 - 📊 **工具调用可视化**：查看 AI 的操作过程
 
+### 实习项目增强版（保留原特色）
+
+本仓库在原始 Deep RAG 思路上，补全了可用于实习/面试展示的工程闭环：
+- ✅ 两阶段检索：`search_paths -> retrieve_sections`
+- ✅ 证据放行与 Critic：答案必须带 `### 证据`
+- ✅ 自动补检索与预算保护：控制 token/时延上限
+- ✅ 多模态入库：语音、图片入库后可立即进入统一检索链路
+- ✅ 评测闭环：RAGAS + token + 延迟
+
+### 架构图（当前实现）
+
+```text
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Frontend (React + TS)                                                     │
+│ Chat / Evaluation / Voice Ingestion / Image Ingestion                     │
+└───────────────────────────────┬────────────────────────────────────────────┘
+                                │ HTTP + SSE
+┌───────────────────────────────▼────────────────────────────────────────────┐
+│ Backend (FastAPI)                                                         │
+│ Chat Orchestrator + ReAct + Critic + Budget Guard                         │
+│ Tools: search_paths / retrieve_sections                                    │
+└───────────────┬───────────────────────────────┬────────────────────────────┘
+                │                               │
+┌───────────────▼───────────────────┐   ┌───────▼───────────────────────────┐
+│ Knowledge Base (.md / image notes)│   │ LLM Provider (OpenAI-compatible)   │
+│ + summary_demo.json path index    │   │ + RAGAS evaluator                  │
+└───────────────────────────────────┘   └────────────────────────────────────┘
+```
+
+### 核心流程图
+
+```text
+用户提问
+  -> 查询扩展 + 路由规划
+  -> search_paths(候选路径)
+  -> retrieve_sections(证据片段)
+  -> evidence_pool 合并
+  -> critic 判定(accept/revise/refuse)
+  -> [不足] 自动补检索
+  -> [通过] 输出答案 + ### 证据
+```
+
+```text
+语音/图片上传
+  -> draft(机器草稿)
+  -> 人工确认
+  -> ingest(写入 Knowledge-Base/*-Notes/*.md)
+  -> update_summary_entry(summary_demo.json)
+  -> 下一轮 search_paths 可直接命中
+```
+
+### 关键指标表（简历可引用）
+
+| 维度 | 基线/优化前 | 当前优化版 | 说明 |
+|---|---:|---:|---|
+| 单题检索上下文体量 | 20,799 chars | 8,343 chars | `-59.9%` |
+| 单题工具链路 | `retrieve_files ×3` | `search_paths -> retrieve_sections` | 两阶段检索 |
+| 40题平均 token（历史 baseline） | 6,177.15 | 14,395.48 | 评测集口径：`ragas评测集_40题` |
+| 40题平均延迟（历史 baseline） | 13,721.10 ms | 39,080.38 ms | 需要继续做成本优化 |
+| 40题忠诚度（RAGAS） | - | 39.86% | 见 `评测/结果/optimized_ragas_40q_汇总.json` |
+
+> 说明：当前 provider 与 RAGAS 某些指标存在输出解析兼容性问题，`context_recall` 与 `answer_correctness` 仍需进一步稳定化（见评测报告中的口径说明）。
+
+实习展示材料：
+- `优化/40题_RAGAS_优化后_vs_baseline.md`
+- `优化/1分钟Demo脚本.md`
+- `优化/亲自解决问题_简历表述.md`
+
 ---
 
 ## 🚀 快速开始

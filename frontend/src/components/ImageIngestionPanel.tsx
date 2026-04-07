@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ImagePlus, RefreshCw, Save, Upload } from 'lucide-react';
 import axios from 'axios';
 import { imageApi } from '../api';
@@ -10,6 +10,15 @@ type ImageIngestionPanelProps = {
 };
 
 const nowIsoLocal = () => new Date().toISOString();
+
+const revokeObjectUrl = (url: string) => {
+  if (!url) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    // ignore revoke failures
+  }
+};
 
 const parseApiError = (error: unknown, fallback: string) => {
   if (axios.isAxiosError(error)) {
@@ -70,6 +79,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
     setStatusMessage('');
     setErrorMessage('');
 
+    revokeObjectUrl(previewUrl);
     if (!file) {
       setPreviewUrl('');
       return;
@@ -126,6 +136,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
   };
 
   const handleClear = () => {
+    revokeObjectUrl(previewUrl);
     setSelectedFile(null);
     setPreviewUrl('');
     setOcrText('');
@@ -142,6 +153,12 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
     setStatusMessage('');
     setErrorMessage('');
   };
+
+  useEffect(() => {
+    return () => {
+      revokeObjectUrl(previewUrl);
+    };
+  }, [previewUrl]);
 
   const handleIngest = async () => {
     if (!selectedFile) {

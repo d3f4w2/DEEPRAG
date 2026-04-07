@@ -1,5 +1,5 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Settings, FileCode, MessageSquare, BarChart3, Mic, Image as ImageIcon } from 'lucide-react';
+import { Send, Loader2, Settings, FileCode, MessageSquare, Mic, Image as ImageIcon } from 'lucide-react';
 import { chatApi } from './api';
 import type {
   BudgetSummary,
@@ -13,7 +13,6 @@ import type {
 import ChatMessage from './components/ChatMessage';
 import SystemPromptPanel from './components/SystemPromptPanel';
 import ConfigPanel from './components/ConfigPanel';
-import EvaluationPanel from './components/EvaluationPanel';
 import VoiceIngestionPanel from './components/VoiceIngestionPanel';
 import VoiceErrorBoundary from './components/VoiceErrorBoundary';
 import ImageIngestionPanel from './components/ImageIngestionPanel';
@@ -124,7 +123,7 @@ const mergeReasoningStages = (
 };
 
 function App() {
-  const [activePage, setActivePage] = useState<'chat' | 'evaluation' | 'voice' | 'image'>('chat');
+  const [activePage, setActivePage] = useState<'chat' | 'voice' | 'image'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -596,14 +595,6 @@ function App() {
                 <span>Chat</span>
               </button>
               <button
-                className={`nav-button ${activePage === 'evaluation' ? 'active' : ''}`}
-                onClick={() => setActivePage('evaluation')}
-                title="Evaluation"
-              >
-                <BarChart3 size={16} />
-                <span>测评</span>
-              </button>
-              <button
                 className={`nav-button ${activePage === 'voice' ? 'active' : ''}`}
                 onClick={() => setActivePage('voice')}
                 title="Voice Ingestion"
@@ -794,10 +785,6 @@ function App() {
               </div>
             </div>
           </>
-        ) : activePage === 'evaluation' ? (
-          <div className="chat-container">
-            <EvaluationPanel />
-          </div>
         ) : activePage === 'voice' ? (
           <div className="chat-container">
             <VoiceErrorBoundary>

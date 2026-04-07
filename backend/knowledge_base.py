@@ -185,6 +185,7 @@ class KnowledgeBase:
         results: List[str] = []
         notes: List[str] = []
         total_chars = 0
+        base_root = self.base_path.resolve()
 
         for file_path in resolved_files:
             content = await self._read_file(file_path)
@@ -198,7 +199,10 @@ class KnowledgeBase:
                     clipped = clipped[: self.max_section_chars]
                     clipped += f"\n\n[Truncated section to {self.max_section_chars} chars]"
 
-                rel = str(file_path.relative_to(self.base_path)).replace("\\", "/")
+                try:
+                    rel = str(file_path.resolve().relative_to(base_root)).replace("\\", "/")
+                except Exception:
+                    rel = file_path.name
                 header = (
                     f"[[FILE:{rel} | SECTION:{section_idx} | SCORE:{score:.2f} "
                     f"| HEADING:{heading}]]"
@@ -283,6 +287,7 @@ class KnowledgeBase:
         files: List[Path] = []
         seen: set[str] = set()
         stop = False
+        base_root = self.base_path.resolve()
 
         for raw_path in file_paths:
             if stop:
@@ -294,7 +299,11 @@ class KnowledgeBase:
             if requested_path == "/":
                 candidates = sorted(self.base_path.rglob("*.md")) if self.allow_retrieve_all else []
             else:
-                full_path = self.base_path / requested_path.lstrip("/")
+                try:
+                    full_path = (self.base_path / requested_path.lstrip("/")).resolve()
+                    full_path.relative_to(base_root)
+                except Exception:
+                    continue
                 if full_path.is_dir():
                     candidates = sorted(full_path.rglob("*.md"))
                 elif full_path.is_file():
@@ -303,11 +312,16 @@ class KnowledgeBase:
                     continue
 
             for candidate in candidates:
-                rel = str(candidate.relative_to(self.base_path)).replace("\\", "/")
+                try:
+                    candidate_resolved = candidate.resolve()
+                    candidate_resolved.relative_to(base_root)
+                    rel = str(candidate_resolved.relative_to(base_root)).replace("\\", "/")
+                except Exception:
+                    continue
                 if rel in seen:
                     continue
                 seen.add(rel)
-                files.append(candidate)
+                files.append(candidate_resolved)
                 if len(files) >= self.max_retrieve_files:
                     stop = True
                     break

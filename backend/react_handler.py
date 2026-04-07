@@ -204,6 +204,19 @@ def _build_rule_based_critic_decision(strength: Dict[str, Any]) -> Dict[str, Any
     query_terms = int(strength.get("query_terms", 0) or 0)
     query_term_hits = int(strength.get("query_term_hits", 0) or 0)
     confidence = _estimate_critic_confidence(strength)
+    uncertain_answer = bool(strength.get("uncertain_answer", False))
+    required_hits = min(CRITIC_MIN_QUERY_TERM_HITS, query_terms) if query_terms > 0 else 0
+
+    adaptive_accept_confidence = float(CRITIC_ACCEPT_CONFIDENCE)
+    if not uncertain_answer:
+        # Dense multi-file evidence should not be rejected by an overly strict
+        # global threshold in simple/list questions.
+        if evidence_items >= 6 and distinct_files >= 3 and query_term_hits >= 1:
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.58)
+        elif evidence_items >= 4 and distinct_files >= 2 and query_term_hits >= 1:
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.62)
+        elif evidence_items >= 2 and query_term_hits >= 1:
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.66)
 
     blockers: List[str] = []
     if evidence_items < CRITIC_MIN_EVIDENCE_ITEMS:
@@ -211,12 +224,11 @@ def _build_rule_based_critic_decision(strength: Dict[str, Any]) -> Dict[str, Any
     if distinct_files < CRITIC_MIN_DISTINCT_FILES:
         blockers.append(f"来源文件不足({distinct_files}/{CRITIC_MIN_DISTINCT_FILES})")
     if query_terms > 0:
-        required_hits = min(CRITIC_MIN_QUERY_TERM_HITS, query_terms)
         if query_term_hits < required_hits:
             blockers.append(f"问题关键词命中不足({query_term_hits}/{required_hits})")
-    if confidence < CRITIC_ACCEPT_CONFIDENCE:
+    if confidence < adaptive_accept_confidence:
         blockers.append(
-            f"证据分偏低({round(confidence * 100)}%<{round(CRITIC_ACCEPT_CONFIDENCE * 100)}%)"
+            f"证据分偏低({round(confidence * 100)}%<{round(adaptive_accept_confidence * 100)}%)"
         )
 
     if not blockers:
@@ -388,8 +400,7 @@ async def _llm_run_retrieval_critic(
         decision = "revise"
         stop = False
         mode = "llm_parse_error"
-        if reason == "critic output invalid":
-            reason = "critic output invalid json schema"
+        reason = "critic schema invalid, fallback to rule critic"
     else:
         decision = raw_decision or ("accept" if raw_stop else "revise")
         stop = decision == "accept"
@@ -1226,6 +1237,70 @@ async def handle_react_mode(
         )
 
     if not final_answer_sent:
+        if ENFORCE_CRITIC_RETRIEVAL and not evidence_pool:
+            if ENABLE_PLAN_EXECUTE_STAGES:
+                emergency_stage_payload = _build_reasoning_stage_payload(
+                    stage_key="execute",
+                    status="running",
+                    title="结束前兜底检索",
+                    summary="主循环结束但证据为空，触发确定性补检索。",
+                    mode="router",
+                    badge="GUARDRAIL",
+                    metrics=[
+                        {"label": "Candidates", "value": str(len(candidate_paths))},
+                        {"label": "ToolRounds", "value": f"{tool_call_rounds}/{MAX_TOOL_CALL_ROUNDS}"},
+                        {"label": "SearchRounds", "value": f"{retrieval_rounds}/{MAX_RETRIEVAL_ROUNDS}"},
+                    ],
+                )
+                yield f"data: {json.dumps(emergency_stage_payload, ensure_ascii=False)}\\n\\n"
+
+            emergency_paths = list(candidate_paths)
+            if (not emergency_paths) and tool_call_rounds < MAX_TOOL_CALL_ROUNDS and retrieval_rounds < MAX_RETRIEVAL_ROUNDS:
+                emergency_search_call = _build_tool_call(
+                    call_id="emergency_search_final",
+                    name="search_paths",
+                    arguments={
+                        "query": user_query or latest_candidate_answer or "knowledge base question",
+                        "top_k": int(safe_plan.get("top_k", 6)),
+                    },
+                )
+                yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': [emergency_search_call]})}\\n\\n"
+                emergency_search_results = await process_tool_calls([emergency_search_call])
+                tool_call_rounds += 1
+                retrieval_rounds += 1
+                emergency_search_stats = _extract_tool_runtime_stats(emergency_search_results)
+                retry_count_total += emergency_search_stats["retry_total"]
+                retry_exhausted_count += emergency_search_stats["retry_exhausted"]
+                cache_hit_count += emergency_search_stats["cache_hits"]
+                yield f"data: {json.dumps({'type': 'tool_results', 'results': emergency_search_results})}\\n\\n"
+                emergency_paths = _extract_candidate_paths(emergency_search_results[0].get("content", ""))
+                if emergency_paths:
+                    candidate_paths = emergency_paths
+
+            if emergency_paths and tool_call_rounds < MAX_TOOL_CALL_ROUNDS:
+                emergency_targets = emergency_paths[: max(int(safe_plan.get("min_file_paths", 4)), 2)]
+                emergency_retrieve_call = _build_tool_call(
+                    call_id="emergency_retrieve_final",
+                    name="retrieve_sections",
+                    arguments={
+                        "file_paths": emergency_targets,
+                        "query": user_query or latest_candidate_answer or "knowledge base question",
+                        "max_sections_per_file": int(safe_plan.get("max_sections_per_file", 2)),
+                    },
+                )
+                yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': [emergency_retrieve_call]})}\\n\\n"
+                emergency_retrieve_results = await process_tool_calls([emergency_retrieve_call])
+                tool_call_rounds += 1
+                emergency_retrieve_stats = _extract_tool_runtime_stats(emergency_retrieve_results)
+                retry_count_total += emergency_retrieve_stats["retry_total"]
+                retry_exhausted_count += emergency_retrieve_stats["retry_exhausted"]
+                cache_hit_count += emergency_retrieve_stats["cache_hits"]
+                yield f"data: {json.dumps({'type': 'tool_results', 'results': emergency_retrieve_results})}\\n\\n"
+                evidence_pool = _merge_evidence_pool(
+                    evidence_pool,
+                    _extract_evidence_entries(emergency_retrieve_results[0].get("content", "")),
+                )
+
         critic_result = await _llm_run_retrieval_critic(
             provider=provider,
             user_query=user_query,

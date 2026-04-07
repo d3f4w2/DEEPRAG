@@ -84,6 +84,62 @@ Deep RAG provides:
 - 🔧 **Easy Configuration**: Web-based .env editor
 - 📊 **Tool Call Visualization**: See what the AI is doing
 
+### Internship-Ready Enhancements (while keeping original Deep RAG strengths)
+
+This repo now includes a practical engineering loop suitable for resume/interview demos:
+- ✅ Two-stage retrieval: `search_paths -> retrieve_sections`
+- ✅ Evidence gate + critic: final answer must include `### 证据`
+- ✅ Auto-retrieval retry + budget guard (token/latency constraints)
+- ✅ Multimodal ingestion: voice/image notes become searchable immediately
+- ✅ Evaluation loop: RAGAS + token + latency
+
+### Current Architecture
+
+```text
+Frontend (React + TS)
+  Chat / Evaluation / Voice Ingestion / Image Ingestion
+            |
+          HTTP + SSE
+            v
+Backend (FastAPI)
+  Chat Orchestrator + ReAct + Critic + Budget Guard
+  Tools: search_paths / retrieve_sections
+            |
+   +--------+-------------------+
+   |                            |
+Knowledge Base + summary index   LLM Provider + RAGAS evaluator
+```
+
+### Core Flow
+
+```text
+User question
+  -> query expansion + route planning
+  -> search_paths (candidate files)
+  -> retrieve_sections (evidence snippets)
+  -> merge evidence_pool
+  -> critic decision (accept/revise/refuse)
+  -> [if weak] auto retrieval retry
+  -> [if pass] final answer + ### 证据
+```
+
+### Key Metrics (resume-friendly)
+
+| Dimension | Baseline/Before | Current | Notes |
+|---|---:|---:|---|
+| Single-question retrieval context volume | 20,799 chars | 8,343 chars | `-59.9%` |
+| Single-question tool chain | `retrieve_files ×3` | `search_paths -> retrieve_sections` | Two-stage retrieval |
+| 40Q avg token (historical baseline) | 6,177.15 | 14,395.48 | dataset: `ragas评测集_40题` |
+| 40Q avg latency (historical baseline) | 13,721.10 ms | 39,080.38 ms | still needs cost/perf optimization |
+| 40Q faithfulness (RAGAS) | - | 39.86% | `评测/结果/optimized_ragas_40q_汇总.json` |
+
+> Note: with the current provider, some RAGAS parser compatibility issues still affect `context_recall` and `answer_correctness`; see the evaluation report notes.
+
+Interview-ready assets:
+- `优化/40题_RAGAS_优化后_vs_baseline.md`
+- `优化/1分钟Demo脚本.md`
+- `优化/亲自解决问题_简历表述.md`
+
 ---
 
 ## 🚀 Quick Start

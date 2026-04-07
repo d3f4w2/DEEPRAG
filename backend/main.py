@@ -61,6 +61,12 @@ DEFAULT_ROUTE_PLAN = {
     "max_sections_per_file": 2,
     "min_file_paths": 4,
 }
+DEFAULT_QUESTION_ROUTE = {
+    "route": "contextual_followup",
+    "history_mode": "full",
+    "max_iterations": 10,
+    "reason": "default",
+}
 STAGE_ORDER = {
     "plan": 10,
     "execute": 20,
@@ -420,6 +426,19 @@ def _build_rule_based_critic_decision(metrics: Dict[str, Any]) -> Dict[str, Any]
     query_terms = int(metrics.get("query_terms", 0) or 0)
     query_term_hits = int(metrics.get("query_term_hits", 0) or 0)
     confidence = float(metrics.get("confidence", 0.0) or 0.0)
+    uncertain_answer = bool(metrics.get("uncertain_answer", False))
+    required_hits = min(CRITIC_MIN_QUERY_TERM_HITS, query_terms) if query_terms > 0 else 0
+
+    adaptive_accept_confidence = float(CRITIC_ACCEPT_CONFIDENCE)
+    if not uncertain_answer:
+        # Dense multi-file evidence should not be rejected by an overly strict
+        # global threshold in simple/list questions.
+        if evidence_items >= 6 and distinct_files >= 3 and query_term_hits >= 1:
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.58)
+        elif evidence_items >= 4 and distinct_files >= 2 and query_term_hits >= 1:
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.62)
+        elif evidence_items >= 2 and query_term_hits >= 1:
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.66)
 
     blockers: List[str] = []
     if evidence_items < CRITIC_MIN_EVIDENCE_ITEMS:
@@ -427,12 +446,11 @@ def _build_rule_based_critic_decision(metrics: Dict[str, Any]) -> Dict[str, Any]
     if distinct_files < CRITIC_MIN_DISTINCT_FILES:
         blockers.append(f"来源文件不足({distinct_files}/{CRITIC_MIN_DISTINCT_FILES})")
     if query_terms > 0:
-        required_hits = min(CRITIC_MIN_QUERY_TERM_HITS, query_terms)
         if query_term_hits < required_hits:
             blockers.append(f"问题关键词命中不足({query_term_hits}/{required_hits})")
-    if confidence < CRITIC_ACCEPT_CONFIDENCE:
+    if confidence < adaptive_accept_confidence:
         blockers.append(
-            f"证据分偏低({round(confidence * 100)}%<{round(CRITIC_ACCEPT_CONFIDENCE * 100)}%)"
+            f"证据分偏低({round(confidence * 100)}%<{round(adaptive_accept_confidence * 100)}%)"
         )
 
     if not blockers:
@@ -696,6 +714,129 @@ def _coerce_int(value: Any, default: int, low: int, high: int) -> int:
     return max(low, min(iv, high))
 
 
+def _guess_question_route(user_query: str) -> Dict[str, Any]:
+    query = _normalize_whitespace(user_query)
+    if not query:
+        return dict(DEFAULT_QUESTION_ROUTE)
+
+    lower_query = query.lower()
+    followup_markers = (
+        "上面",
+        "前面",
+        "刚才",
+        "上一轮",
+        "继续",
+        "接着",
+    )
+    deep_markers = (
+        "对比",
+        "比较",
+        "分析",
+        "总结",
+        "方案",
+        "优缺点",
+        "原因",
+        "架构",
+        "趋势",
+        "tradeoff",
+        "compare",
+        "analysis",
+        "strategy",
+    )
+
+    is_followup = any(marker in query for marker in followup_markers) or bool(
+        re.search(r"\b(previous|above|earlier|follow[- ]?up|former|latter)\b", lower_query)
+    )
+    is_deep = any(marker in query for marker in deep_markers) or len(query) >= 90
+
+    if is_deep:
+        return {
+            "route": "deep_analysis",
+            "history_mode": "full",
+            "max_iterations": 12,
+            "reason": "heuristic_deep",
+        }
+    if is_followup:
+        return {
+            "route": "contextual_followup",
+            "history_mode": "full",
+            "max_iterations": 10,
+            "reason": "heuristic_followup",
+        }
+    return {
+        "route": "simple_fact",
+        "history_mode": "latest_only",
+        "max_iterations": 6,
+        "reason": "heuristic_simple",
+    }
+
+
+def _normalize_question_route_payload(
+    payload: Dict[str, Any],
+    fallback: Dict[str, Any],
+) -> Dict[str, Any]:
+    route = _normalize_whitespace(str(payload.get("route", fallback.get("route", "")))).lower()
+    if route not in {"simple_fact", "contextual_followup", "deep_analysis"}:
+        route = str(fallback.get("route", "contextual_followup"))
+
+    history_mode = _normalize_whitespace(
+        str(payload.get("history_mode", fallback.get("history_mode", "")))
+    ).lower()
+    if history_mode not in {"latest_only", "full"}:
+        history_mode = "latest_only" if route == "simple_fact" else "full"
+
+    default_max_iterations = int(fallback.get("max_iterations", 10) or 10)
+    max_iterations = _coerce_int(
+        payload.get("max_iterations"),
+        default_max_iterations,
+        4,
+        16,
+    )
+    if route == "simple_fact":
+        max_iterations = min(max_iterations, 8)
+    elif route == "deep_analysis":
+        max_iterations = max(max_iterations, 10)
+
+    reason = _clip_text(str(payload.get("reason", fallback.get("reason", ""))), 80)
+    if not reason:
+        reason = str(fallback.get("reason", "default"))
+
+    return {
+        "route": route,
+        "history_mode": history_mode,
+        "max_iterations": max_iterations,
+        "reason": reason,
+    }
+
+
+def _select_messages_by_history_mode(
+    history_messages: List[Dict[str, str]],
+    history_mode: str,
+) -> List[Dict[str, str]]:
+    if history_mode != "latest_only":
+        return list(history_messages or [])
+
+    latest_user: Optional[Dict[str, str]] = None
+    for message in reversed(history_messages or []):
+        role = _normalize_whitespace(str(message.get("role", ""))).lower()
+        content = str(message.get("content", ""))
+        if role == "user" and _normalize_whitespace(content):
+            latest_user = {"role": "user", "content": content}
+            break
+
+    if latest_user:
+        return [latest_user]
+    if history_messages:
+        last_item = history_messages[-1]
+        return [
+            {
+                "role": str(last_item.get("role", "user")),
+                "content": str(last_item.get("content", "")),
+            }
+        ]
+    return []
+
+
 def _safe_parse_tool_args(arguments: str) -> Dict[str, Any]:
     return _extract_json_object(arguments or "")
 
@@ -840,8 +981,7 @@ async def _llm_run_retrieval_critic(
         decision = "revise"
         stop = False
         mode = "llm_parse_error"
-        if reason == "critic output invalid":
-            reason = "critic output invalid json schema"
+        reason = "critic schema invalid, fallback to rule critic"
     else:
         decision = raw_decision or ("accept" if raw_stop else "revise")
         stop = decision == "accept"
@@ -858,6 +998,73 @@ async def _llm_run_retrieval_critic(
             evidence_pool=evidence_pool,
         )
     )
+
+
+async def _llm_route_question(
+    provider: LLMProvider,
+    *,
+    latest_user_query: str,
+    message_history: List[Dict[str, str]],
+) -> Dict[str, Any]:
+    fallback = _guess_question_route(latest_user_query)
+    query = _normalize_whitespace(latest_user_query)
+    if not query:
+        return _normalize_question_route_payload({}, fallback)
+
+    history_preview: List[Dict[str, str]] = []
+    for item in (message_history or [])[-6:]:
+        role = _normalize_whitespace(str(item.get("role", ""))).lower()
+        if role not in {"user", "assistant"}:
+            continue
+        content = _clip_text(str(item.get("content", "")), 120)
+        if not content:
+            continue
+        history_preview.append({"role": role, "content": content})
+
+    router_messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a question router for a multi-turn RAG assistant. "
+                "Return strict JSON only: "
+                "{\"route\":\"simple_fact|contextual_followup|deep_analysis\","
+                "\"history_mode\":\"latest_only|full\","
+                "\"max_iterations\":int,"
+                "\"reason\":string}. "
+                "Rules: "
+                "1) simple_fact = standalone, direct lookup/list question, prefer latest_only with lower iterations. "
+                "2) contextual_followup = references prior turns (such as 上面/刚才/previous/above), must use full history. "
+                "3) deep_analysis = multi-step comparison/synthesis/planning question, use full history and higher iterations. "
+                "4) If uncertain, choose contextual_followup."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "latest_user_query": query,
+                    "recent_dialogue": history_preview,
+                },
+                ensure_ascii=False,
+            ),
+        },
+    ]
+
+    raw_text = ""
+    try:
+        async for chunk_str in provider.chat_completion(
+            messages=router_messages,
+            tools=None,
+            stream=False,
+        ):
+            chunk = json.loads(chunk_str)
+            if chunk.get("type") == "content":
+                raw_text += str(chunk.get("content") or "")
+    except Exception:
+        return _normalize_question_route_payload({}, fallback)
+
+    parsed = _extract_json_object(raw_text)
+    return _normalize_question_route_payload(parsed, fallback)
 
 
 async def _llm_expand_retrieval_query(provider: LLMProvider, user_query: str) -> Dict[str, Any]:
@@ -1053,7 +1260,7 @@ def _parse_voice_draft_response(raw_text: str) -> tuple[str, str, str]:
 
     # 4) Label format: English.
     m_en = re.search(
-        r"POLISHED_TEXT\s*[:锛歖\s*([\s\S]*?)(?:\n+\s*SUMMARY\s*[:锛歖\s*([\s\S]*))?$",
+        r"POLISHED_TEXT\s*[:：]\s*([\s\S]*?)(?:\n+\s*SUMMARY\s*[:：]\s*([\s\S]*))?$",
         raw,
         flags=re.IGNORECASE,
     )
@@ -1065,7 +1272,7 @@ def _parse_voice_draft_response(raw_text: str) -> tuple[str, str, str]:
 
     # 5) Label format: Chinese.
     m_zh = re.search(
-        r"(?:娑﹁壊鏂囨湰|绾犳鏂囨湰|鑽夌)\s*[:锛歖\s*([\s\S]*?)(?:\n+\s*(?:鎽樿|鎬荤粨)\s*[:锛歖\s*([\s\S]*))?$",
+        r"(?:润色文本|纠正文本|草稿)\s*[:：]\s*([\s\S]*?)(?:\n+\s*(?:摘要|总结)\s*[:：]\s*([\s\S]*))?$",
         raw,
         flags=re.IGNORECASE,
     )
@@ -1125,7 +1332,7 @@ async def _llm_voice_summary(
         return ""
 
     plain = _normalize_whitespace(raw)
-    plain = re.sub(r"^(?:summary|鎽樿|鎬荤粨)\s*[:锛歖\s*", "", plain, flags=re.IGNORECASE)
+    plain = re.sub(r"^(?:summary|摘要|总结)\s*[:：]\s*", "", plain, flags=re.IGNORECASE)
     return plain
 
 
@@ -1619,12 +1826,30 @@ async def chat(request: ChatRequest):
         else:
             system_prompt = create_system_prompt(file_summary)
         
-        messages = [{"role": "system", "content": system_prompt}]
-        messages.extend([msg.dict() for msg in request.messages])
+        request_history_messages = [msg.dict() for msg in request.messages]
         latest_user_query = next(
             (msg.content for msg in reversed(request.messages) if msg.role == "user"),
             "",
         )
+        question_route = await _llm_route_question(
+            provider,
+            latest_user_query=latest_user_query,
+            message_history=request_history_messages,
+        )
+        route_name = str(question_route.get("route", "contextual_followup"))
+        history_mode = str(question_route.get("history_mode", "full"))
+        route_reason = _normalize_whitespace(str(question_route.get("reason", "")))
+        route_max_iterations = _coerce_int(question_route.get("max_iterations"), 10, 4, 16)
+
+        routed_history_messages = _select_messages_by_history_mode(
+            request_history_messages,
+            history_mode,
+        )
+        if not routed_history_messages and request_history_messages:
+            routed_history_messages = [request_history_messages[-1]]
+
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(routed_history_messages)
         query_plan = await _llm_expand_retrieval_query(provider, latest_user_query)
         retrieval_query = query_plan.get("expanded_query") or latest_user_query
         hints = query_plan.get("hints") or []
@@ -1633,20 +1858,35 @@ async def chat(request: ChatRequest):
                 f"{retrieval_query} {' '.join(str(h) for h in hints[:10])}"
             )
         route_plan = await _plan_retrieval_route(provider, latest_user_query)
+        if route_name == "simple_fact":
+            route_plan["top_k"] = _coerce_int(route_plan.get("top_k"), 5, 4, 6)
+            route_plan["min_file_paths"] = _coerce_int(route_plan.get("min_file_paths"), 3, 2, 4)
+            route_plan["max_sections_per_file"] = _coerce_int(
+                route_plan.get("max_sections_per_file"),
+                2,
+                1,
+                2,
+            )
+        elif route_name == "deep_analysis":
+            route_plan["top_k"] = _coerce_int(route_plan.get("top_k"), 8, 6, 10)
+            route_plan["min_file_paths"] = _coerce_int(route_plan.get("min_file_paths"), 5, 4, 8)
+            route_plan["max_sections_per_file"] = _coerce_int(
+                route_plan.get("max_sections_per_file"),
+                3,
+                2,
+                4,
+            )
         if query_plan.get("image_intent"):
             route_plan["top_k"] = max(route_plan["top_k"], 8)
             route_plan["min_file_paths"] = max(route_plan["min_file_paths"], 5)
             route_plan["max_sections_per_file"] = max(route_plan["max_sections_per_file"], 2)
-        budget_config = request.budget.model_dump() if request.budget else None
-        budget_state = create_budget_state(budget_config)
-        
         if use_react:
             async def generate_response() -> AsyncIterator[str]:
                 if ENABLE_PLAN_EXECUTE_STAGES:
                     plan_payload = _build_reasoning_stage_payload(
                         stage_key="plan",
                         status="completed",
-                        title="妫€绱㈣鍒掑凡鐢熸垚",
+                        title="检索计划已生成",
                         summary=_build_plan_stage_summary(latest_user_query),
                         mode="llm",
                         badge="LLM ROUTER",
@@ -1655,6 +1895,11 @@ async def chat(request: ChatRequest):
                             {"label": "Files", "value": str(route_plan["min_file_paths"])},
                             {"label": "Sections", "value": str(route_plan["max_sections_per_file"])},
                             {"label": "Hints", "value": str(len(hints) if isinstance(hints, list) else 0)},
+                            {"label": "Route", "value": route_name},
+                            {"label": "History", "value": history_mode},
+                            {"label": "MaxIter", "value": str(route_max_iterations)},
+                            {"label": "CtxMsgs", "value": str(len(routed_history_messages))},
+                            {"label": "RouteWhy", "value": route_reason or "n/a"},
                             {"label": "ImageIntent", "value": "yes" if query_plan.get("image_intent") else "no"},
                         ],
                     )
@@ -1665,6 +1910,7 @@ async def chat(request: ChatRequest):
                     user_query=retrieval_query,
                     route_plan=route_plan,
                     budget_state=budget_state,
+                    max_iterations=route_max_iterations,
                 ):
                     yield chunk
                 budget_summary_payload = build_budget_event(
@@ -1690,7 +1936,12 @@ async def chat(request: ChatRequest):
         
         async def generate_response() -> AsyncIterator[str]:
             conversation_messages = messages.copy()
-            max_iterations = 12
+            max_iterations = _coerce_int(
+                route_max_iterations + (2 if history_mode == "full" else 1),
+                10,
+                6,
+                18,
+            )
             iteration = 0
             allowed_tool_names = {"search_paths", "retrieve_sections"}
             has_search_step = False
@@ -1713,7 +1964,7 @@ async def chat(request: ChatRequest):
                 plan_payload = _build_reasoning_stage_payload(
                     stage_key="plan",
                     status="completed",
-                    title="妫€绱㈣鍒掑凡鐢熸垚",
+                    title="检索计划已生成",
                     summary=_build_plan_stage_summary(latest_user_query),
                     mode="llm",
                     badge="LLM ROUTER",
@@ -1722,10 +1973,108 @@ async def chat(request: ChatRequest):
                         {"label": "Files", "value": str(route_plan["min_file_paths"])},
                         {"label": "Sections", "value": str(route_plan["max_sections_per_file"])},
                         {"label": "Hints", "value": str(len(hints) if isinstance(hints, list) else 0)},
+                        {"label": "Route", "value": route_name},
+                        {"label": "History", "value": history_mode},
+                        {"label": "MaxIter", "value": str(route_max_iterations)},
+                        {"label": "CtxMsgs", "value": str(len(routed_history_messages))},
+                        {"label": "RouteWhy", "value": route_reason or "n/a"},
                         {"label": "ImageIntent", "value": "yes" if query_plan.get("image_intent") else "no"},
                     ],
                 )
                 yield f"data: {json.dumps(plan_payload, ensure_ascii=False)}\n\n"
+
+            # Fast lane for simple standalone questions:
+            # prefetch one deterministic retrieval round so evidence_pool is not
+            # fully dependent on model tool-call quality.
+            if route_name == "simple_fact":
+                if tool_call_rounds < MAX_TOOL_CALL_ROUNDS and retrieval_rounds < MAX_RETRIEVAL_ROUNDS:
+                    prefetch_top_k = _coerce_int(route_plan.get("top_k"), 5, 3, 10)
+                    prefetch_search_call = _build_tool_call(
+                        call_id="prefetch_search_0",
+                        name="search_paths",
+                        arguments={
+                            "query": retrieval_query,
+                            "top_k": prefetch_top_k,
+                        },
+                    )
+                    if ENABLE_PLAN_EXECUTE_STAGES:
+                        prefetch_stage = _build_reasoning_stage_payload(
+                            stage_key="execute",
+                            status="running",
+                            title="简单问题预检索：路径",
+                            summary="进入主循环前先做一轮确定性检索，减少多轮漂移。",
+                            mode="router",
+                            badge="PREFETCH",
+                            metrics=[
+                                {"label": "TopK", "value": str(prefetch_top_k)},
+                                {"label": "Route", "value": route_name},
+                            ],
+                        )
+                        yield f"data: {json.dumps(prefetch_stage, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': [prefetch_search_call]})}\n\n"
+                    prefetch_search_results = await process_tool_calls([prefetch_search_call])
+                    tool_call_rounds += 1
+                    retrieval_rounds += 1
+                    prefetch_search_stats = _extract_tool_runtime_stats(prefetch_search_results)
+                    cache_hit_count += prefetch_search_stats["cache_hits"]
+                    retry_count_total += prefetch_search_stats["retry_total"]
+                    retry_exhausted_count += prefetch_search_stats["retry_exhausted"]
+                    yield f"data: {json.dumps({'type': 'tool_results', 'results': prefetch_search_results})}\n\n"
+                    conversation_messages.append(
+                        {"role": "assistant", "content": None, "tool_calls": [prefetch_search_call]}
+                    )
+                    conversation_messages.extend(prefetch_search_results)
+
+                    candidate_paths = _extract_candidate_paths(
+                        prefetch_search_results[0].get("content", "")
+                    )
+                    has_search_step = bool(candidate_paths)
+
+                    if candidate_paths and tool_call_rounds < MAX_TOOL_CALL_ROUNDS:
+                        prefetch_targets = candidate_paths[: max(route_plan["min_file_paths"], 2)]
+                        prefetch_retrieve_call = _build_tool_call(
+                            call_id="prefetch_retrieve_0",
+                            name="retrieve_sections",
+                            arguments={
+                                "file_paths": prefetch_targets,
+                                "query": retrieval_query,
+                                "max_sections_per_file": route_plan["max_sections_per_file"],
+                            },
+                        )
+                        if ENABLE_PLAN_EXECUTE_STAGES:
+                            prefetch_stage = _build_reasoning_stage_payload(
+                                stage_key="execute",
+                                status="running",
+                                title="简单问题预检索：片段",
+                                summary="已拿到候选文件，预先回收证据片段。",
+                                mode="router",
+                                badge="PREFETCH",
+                                metrics=[
+                                    {"label": "Targets", "value": str(len(prefetch_targets))},
+                                    {"label": "Sections", "value": str(route_plan["max_sections_per_file"])},
+                                ],
+                            )
+                            yield f"data: {json.dumps(prefetch_stage, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': [prefetch_retrieve_call]})}\n\n"
+                        prefetch_retrieve_results = await process_tool_calls([prefetch_retrieve_call])
+                        tool_call_rounds += 1
+                        prefetch_retrieve_stats = _extract_tool_runtime_stats(prefetch_retrieve_results)
+                        cache_hit_count += prefetch_retrieve_stats["cache_hits"]
+                        retry_count_total += prefetch_retrieve_stats["retry_total"]
+                        retry_exhausted_count += prefetch_retrieve_stats["retry_exhausted"]
+                        yield f"data: {json.dumps({'type': 'tool_results', 'results': prefetch_retrieve_results})}\n\n"
+                        conversation_messages.append(
+                            {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [prefetch_retrieve_call],
+                            }
+                        )
+                        conversation_messages.extend(prefetch_retrieve_results)
+                        evidence_pool = _merge_evidence_pool(
+                            evidence_pool,
+                            _extract_evidence_entries(prefetch_retrieve_results[0].get("content", "")),
+                        )
             
             while iteration < max_iterations:
                 if tool_call_rounds >= MAX_TOOL_CALL_ROUNDS:
@@ -2135,7 +2484,7 @@ async def chat(request: ChatRequest):
                             "role": "user",
                             "content": (
                                 "Your previous answer did not include evidence citations. "
-                                "Re-answer strictly with a final section titled '### 璇佹嵁' "
+                                "Re-answer strictly with a final section titled '### 证据' "
                                 "and include source file path plus evidence snippet."
                             ),
                         }
@@ -2188,13 +2537,80 @@ async def chat(request: ChatRequest):
                             "Critic requires additional retrieval. "
                             f"Reason: {critic_payload.get('reason', '')}. "
                             "Continue with search_paths / retrieve_sections and provide a stronger answer "
-                            "with a final section titled '### 璇佹嵁'."
+                            "with a final section titled '### 证据'."
                         ),
                     }
                 )
                 continue
             
             if not final_answer_sent:
+                if ENFORCE_CRITIC_RETRIEVAL and not evidence_pool and not budget_exceeded:
+                    if ENABLE_PLAN_EXECUTE_STAGES:
+                        emergency_stage_payload = _build_reasoning_stage_payload(
+                            stage_key="execute",
+                            status="running",
+                            title="结束前兜底检索",
+                            summary="主循环结束但证据为空，触发确定性补检索。",
+                            mode="router",
+                            badge="GUARDRAIL",
+                            metrics=[
+                                {"label": "Candidates", "value": str(len(candidate_paths))},
+                                {"label": "ToolRounds", "value": f"{tool_call_rounds}/{MAX_TOOL_CALL_ROUNDS}"},
+                                {"label": "SearchRounds", "value": f"{retrieval_rounds}/{MAX_RETRIEVAL_ROUNDS}"},
+                            ],
+                        )
+                        yield f"data: {json.dumps(emergency_stage_payload, ensure_ascii=False)}\n\n"
+
+                    emergency_paths = list(candidate_paths)
+                    if (not emergency_paths) and tool_call_rounds < MAX_TOOL_CALL_ROUNDS and retrieval_rounds < MAX_RETRIEVAL_ROUNDS:
+                        emergency_search_call = _build_tool_call(
+                            call_id="emergency_search_final",
+                            name="search_paths",
+                            arguments={
+                                "query": retrieval_query or latest_user_query,
+                                "top_k": route_plan["top_k"],
+                            },
+                        )
+                        yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': [emergency_search_call]})}\n\n"
+                        emergency_search_results = await process_tool_calls([emergency_search_call])
+                        tool_call_rounds += 1
+                        retrieval_rounds += 1
+                        emergency_search_stats = _extract_tool_runtime_stats(emergency_search_results)
+                        cache_hit_count += emergency_search_stats["cache_hits"]
+                        retry_count_total += emergency_search_stats["retry_total"]
+                        retry_exhausted_count += emergency_search_stats["retry_exhausted"]
+                        yield f"data: {json.dumps({'type': 'tool_results', 'results': emergency_search_results})}\n\n"
+                        emergency_paths = _extract_candidate_paths(
+                            emergency_search_results[0].get("content", "")
+                        )
+                        if emergency_paths:
+                            candidate_paths = emergency_paths
+                            has_search_step = True
+
+                    if emergency_paths and tool_call_rounds < MAX_TOOL_CALL_ROUNDS:
+                        emergency_targets = emergency_paths[: max(route_plan["min_file_paths"], 2)]
+                        emergency_retrieve_call = _build_tool_call(
+                            call_id="emergency_retrieve_final",
+                            name="retrieve_sections",
+                            arguments={
+                                "file_paths": emergency_targets,
+                                "query": retrieval_query or latest_user_query,
+                                "max_sections_per_file": route_plan["max_sections_per_file"],
+                            },
+                        )
+                        yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': [emergency_retrieve_call]})}\n\n"
+                        emergency_retrieve_results = await process_tool_calls([emergency_retrieve_call])
+                        tool_call_rounds += 1
+                        emergency_retrieve_stats = _extract_tool_runtime_stats(emergency_retrieve_results)
+                        cache_hit_count += emergency_retrieve_stats["cache_hits"]
+                        retry_count_total += emergency_retrieve_stats["retry_total"]
+                        retry_exhausted_count += emergency_retrieve_stats["retry_exhausted"]
+                        yield f"data: {json.dumps({'type': 'tool_results', 'results': emergency_retrieve_results})}\n\n"
+                        evidence_pool = _merge_evidence_pool(
+                            evidence_pool,
+                            _extract_evidence_entries(emergency_retrieve_results[0].get("content", "")),
+                        )
+
                 critic_payload = await _llm_run_retrieval_critic(
                     provider,
                     user_query=latest_user_query,
