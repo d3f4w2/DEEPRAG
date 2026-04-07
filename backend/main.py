@@ -83,6 +83,24 @@ ENFORCE_CRITIC_RETRIEVAL = os.getenv("ENFORCE_CRITIC_RETRIEVAL", "true").strip()
 MAX_RETRIEVAL_ROUNDS = max(1, min(int(os.getenv("MAX_RETRIEVAL_ROUNDS", "4")), 20))
 MAX_TOOL_CALL_ROUNDS = max(1, min(int(os.getenv("MAX_TOOL_CALL_ROUNDS", "10")), 40))
 MAX_AUTO_RETRIEVAL_ROUNDS = max(0, min(int(os.getenv("MAX_AUTO_RETRIEVAL_ROUNDS", "3")), 10))
+MAX_CRITIC_REVISE_FOLLOWUP_ROUNDS = max(
+    0, min(int(os.getenv("MAX_CRITIC_REVISE_FOLLOWUP_ROUNDS", "1")), 4)
+)
+SOFT_EVIDENCE_DELIVERY_ENABLED = os.getenv(
+    "SOFT_EVIDENCE_DELIVERY_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes", "on"}
+SOFT_EVIDENCE_MIN_CONFIDENCE = max(
+    0.0, min(float(os.getenv("SOFT_EVIDENCE_MIN_CONFIDENCE", "0.5") or 0.5), 1.0)
+)
+SOFT_EVIDENCE_MAX_RETRIEVAL_ROUNDS = max(
+    1, min(int(os.getenv("SOFT_EVIDENCE_MAX_RETRIEVAL_ROUNDS", "2")), 10)
+)
+SOFT_EVIDENCE_MAX_TOOL_CALL_ROUNDS = max(
+    1, min(int(os.getenv("SOFT_EVIDENCE_MAX_TOOL_CALL_ROUNDS", "6")), 20)
+)
+SOFT_EVIDENCE_MAX_TOTAL_TOKENS = max(
+    0, min(int(os.getenv("SOFT_EVIDENCE_MAX_TOTAL_TOKENS", "18000")), 2_000_000)
+)
 MAX_FINAL_EVIDENCE_ITEMS = 3
 MAX_EVIDENCE_SNIPPET_LENGTH = 280
 VOICE_NOTES_DIR = "Voice-Notes"
@@ -116,6 +134,28 @@ UNCERTAIN_ANSWER_KEYWORDS = (
     "无法判断",
     "暂无信息",
     "不清楚",
+)
+BOUNDED_ANSWER_KEYWORDS = (
+    "based on the current evidence",
+    "based on current evidence",
+    "currently supported",
+    "we can confirm",
+    "can confirm",
+    "at least",
+    "partial answer",
+    "narrowed to",
+    "within the evidence",
+    "基于当前证据",
+    "目前能确认",
+    "可以确认",
+    "仅能支持",
+    "证据仅支持",
+    "至少可以确认",
+    "收窄为",
+    "范围收敛",
+    "相关类型",
+    "不代表完整分类",
+    "不能完整支持",
 )
 
 
@@ -211,6 +251,29 @@ def _compose_answer_for_delivery(candidate_answer: str, evidence_pool: List[Dict
     if clean_answer:
         return clean_answer
     return FALLBACK_NO_EVIDENCE_ANSWER
+
+
+def _format_bounded_answer_for_delivery(
+    candidate_answer: str,
+    evidence_pool: List[Dict[str, str]],
+    *,
+    soft_reason: str = "",
+) -> str:
+    clean_answer = _strip_existing_evidence_section(candidate_answer or "").strip()
+    if not clean_answer:
+        clean_answer = "基于当前已检索到的证据，可以先给出一个保守版结论。"
+
+    if not _is_bounded_answer(clean_answer):
+        clean_answer = (
+            "基于当前已检索到的证据，先给出一个保守版结论："
+            + clean_answer
+        )
+
+    note = "注：这是当前证据范围内可支持的回答，不代表已经覆盖全部情况。"
+    if soft_reason:
+        note += f" 为控制成本，此处停止继续检索（{soft_reason}）。"
+
+    return _format_answer_with_evidence(f"{clean_answer}\n\n{note}", evidence_pool)
 
 
 def _build_critic_stage_payload(critic_payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -362,6 +425,13 @@ def _is_uncertain_answer(answer: str) -> bool:
     return any(keyword in text for keyword in UNCERTAIN_ANSWER_KEYWORDS)
 
 
+def _is_bounded_answer(answer: str) -> bool:
+    text = _normalize_whitespace(answer).lower()
+    if not text:
+        return False
+    return any(keyword in text for keyword in BOUNDED_ANSWER_KEYWORDS)
+
+
 def _evaluate_retrieval_critic_metrics(
     *,
     user_query: str,
@@ -404,9 +474,12 @@ def _evaluate_retrieval_critic_metrics(
         else 0.0
     )
     uncertain_answer = _is_uncertain_answer(candidate_answer)
+    bounded_answer = _is_bounded_answer(candidate_answer)
     confidence = hit_ratio * 0.50 + snippet_match_ratio * 0.30 + file_diversity_ratio * 0.20
     if uncertain_answer:
         confidence *= 0.85
+    elif bounded_answer and evidence_count >= 1 and query_term_hits >= 1:
+        confidence = max(confidence, 0.52)
 
     return {
         "evidence_items": evidence_count,
@@ -416,6 +489,7 @@ def _evaluate_retrieval_critic_metrics(
         "query_terms": len(query_signals),
         "matched_evidence_items": int(matched_evidence_items),
         "uncertain_answer": bool(uncertain_answer),
+        "bounded_answer": bool(bounded_answer),
         "confidence": round(max(0.0, min(confidence, 1.0)), 2),
     }
 
@@ -427,9 +501,11 @@ def _build_rule_based_critic_decision(metrics: Dict[str, Any]) -> Dict[str, Any]
     query_term_hits = int(metrics.get("query_term_hits", 0) or 0)
     confidence = float(metrics.get("confidence", 0.0) or 0.0)
     uncertain_answer = bool(metrics.get("uncertain_answer", False))
+    bounded_answer = bool(metrics.get("bounded_answer", False))
     required_hits = min(CRITIC_MIN_QUERY_TERM_HITS, query_terms) if query_terms > 0 else 0
 
     adaptive_accept_confidence = float(CRITIC_ACCEPT_CONFIDENCE)
+    adaptive_min_evidence_items = int(CRITIC_MIN_EVIDENCE_ITEMS)
     if not uncertain_answer:
         # Dense multi-file evidence should not be rejected by an overly strict
         # global threshold in simple/list questions.
@@ -439,10 +515,16 @@ def _build_rule_based_critic_decision(metrics: Dict[str, Any]) -> Dict[str, Any]
             adaptive_accept_confidence = min(adaptive_accept_confidence, 0.62)
         elif evidence_items >= 2 and query_term_hits >= 1:
             adaptive_accept_confidence = min(adaptive_accept_confidence, 0.66)
+        if bounded_answer and evidence_items >= 1 and distinct_files >= 1 and query_term_hits >= 1:
+            adaptive_min_evidence_items = 1
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.50)
+        elif evidence_items >= 1 and distinct_files >= 1 and query_term_hits >= 1 and confidence >= 0.56:
+            adaptive_min_evidence_items = 1
+            adaptive_accept_confidence = min(adaptive_accept_confidence, 0.56)
 
     blockers: List[str] = []
-    if evidence_items < CRITIC_MIN_EVIDENCE_ITEMS:
-        blockers.append(f"证据条数不足({evidence_items}/{CRITIC_MIN_EVIDENCE_ITEMS})")
+    if evidence_items < adaptive_min_evidence_items:
+        blockers.append(f"证据条数不足({evidence_items}/{adaptive_min_evidence_items})")
     if distinct_files < CRITIC_MIN_DISTINCT_FILES:
         blockers.append(f"来源文件不足({distinct_files}/{CRITIC_MIN_DISTINCT_FILES})")
     if query_terms > 0:
@@ -669,9 +751,60 @@ def _build_retrieval_critic_payload(
         "matched_evidence_items": int(metrics.get("matched_evidence_items", 0)),
         "total_snippet_chars": int(metrics.get("total_snippet_chars", 0)),
         "uncertain_answer": bool(metrics.get("uncertain_answer", False)),
+        "bounded_answer": bool(metrics.get("bounded_answer", False)),
         "query_term_hits": int(metrics.get("query_term_hits", 0)),
         "query_terms": int(metrics.get("query_terms", 0)),
     }
+
+
+def _get_soft_delivery_reason(
+    *,
+    critic_payload: Dict[str, Any],
+    candidate_answer: str,
+    evidence_pool: List[Dict[str, str]],
+    retrieval_rounds: int,
+    tool_call_rounds: int,
+    critic_revise_followup_rounds: int,
+    budget_state: Optional[Dict[str, Any]] = None,
+) -> str:
+    if not SOFT_EVIDENCE_DELIVERY_ENABLED or not evidence_pool:
+        return ""
+
+    evidence_items = int(critic_payload.get("evidence_items", 0) or 0)
+    query_term_hits = int(critic_payload.get("query_term_hits", 0) or 0)
+    confidence = float(critic_payload.get("confidence", 0.0) or 0.0)
+    uncertain_answer = bool(critic_payload.get("uncertain_answer", False))
+    bounded_answer = bool(critic_payload.get("bounded_answer", False)) or _is_bounded_answer(
+        candidate_answer
+    )
+    total_tokens = max(0, int((budget_state or {}).get("total_tokens", 0) or 0))
+
+    if evidence_items <= 0 or query_term_hits <= 0:
+        return ""
+    if uncertain_answer and not bounded_answer:
+        return ""
+
+    reasons: List[str] = []
+    if critic_revise_followup_rounds >= MAX_CRITIC_REVISE_FOLLOWUP_ROUNDS:
+        reasons.append("已达到补检索上限")
+    if retrieval_rounds >= SOFT_EVIDENCE_MAX_RETRIEVAL_ROUNDS:
+        reasons.append("检索轮次已偏高")
+    if tool_call_rounds >= SOFT_EVIDENCE_MAX_TOOL_CALL_ROUNDS:
+        reasons.append("工具调用轮次已偏高")
+    if SOFT_EVIDENCE_MAX_TOTAL_TOKENS > 0 and total_tokens >= SOFT_EVIDENCE_MAX_TOTAL_TOKENS:
+        reasons.append(f"token 成本已较高({total_tokens})")
+
+    min_confidence = SOFT_EVIDENCE_MIN_CONFIDENCE
+    if bounded_answer:
+        min_confidence = min(min_confidence, 0.45)
+        if not reasons and confidence >= min_confidence:
+            reasons.append("答案已收敛到当前证据范围")
+
+    if confidence < min_confidence:
+        return ""
+    if not reasons:
+        return ""
+    return "；".join(reasons)
 
 
 def _build_tool_call(call_id: str, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -921,7 +1054,9 @@ async def _llm_run_retrieval_critic(
                 "You are a strict retrieval critic for RAG. "
                 "Return strict JSON only: "
                 "{\"decision\":\"accept|revise|refuse\",\"stop\":bool,\"reason\":string}. "
-                "Set decision=accept and stop=true only when evidence is sufficient and directly supports the answer. "
+                "Set decision=accept and stop=true when evidence sufficiently supports the answer. "
+                "If the question is broad but the answer is explicitly narrowed to what the evidence can support, "
+                "you may still accept it as a bounded answer. "
                 "If evidence is weak/incomplete, set revise + stop=false. "
                 "If no usable evidence exists, set refuse + stop=false."
             ),
@@ -1959,6 +2094,7 @@ async def chat(request: ChatRequest):
             retry_exhausted_count = 0
             cache_hit_count = 0
             auto_retrieval_rounds = 0
+            critic_revise_followup_rounds = 0
 
             if ENABLE_PLAN_EXECUTE_STAGES:
                 plan_payload = _build_reasoning_stage_payload(
@@ -2523,12 +2659,32 @@ async def chat(request: ChatRequest):
                     final_answer_sent = True
                     break
 
+                soft_delivery_reason = _get_soft_delivery_reason(
+                    critic_payload=critic_payload,
+                    candidate_answer=candidate_answer,
+                    evidence_pool=evidence_pool,
+                    retrieval_rounds=retrieval_rounds,
+                    tool_call_rounds=tool_call_rounds,
+                    critic_revise_followup_rounds=critic_revise_followup_rounds,
+                    budget_state=budget_state,
+                )
+                if soft_delivery_reason:
+                    final_answer = _format_bounded_answer_for_delivery(
+                        candidate_answer,
+                        evidence_pool,
+                        soft_reason=soft_delivery_reason,
+                    )
+                    yield f"data: {json.dumps({'type': 'content', 'content': final_answer})}\n\n"
+                    final_answer_sent = True
+                    break
+
                 if not ENFORCE_CRITIC_RETRIEVAL:
                     final_answer = _compose_answer_for_delivery(candidate_answer, evidence_pool)
                     yield f"data: {json.dumps({'type': 'content', 'content': final_answer})}\n\n"
                     final_answer_sent = True
                     break
 
+                critic_revise_followup_rounds += 1
                 conversation_messages.append({"role": "assistant", "content": candidate_answer})
                 conversation_messages.append(
                     {
@@ -2633,6 +2789,15 @@ async def chat(request: ChatRequest):
                     + json.dumps(_build_critic_stage_payload(critic_payload), ensure_ascii=False)
                     + "\n\n"
                 )
+                soft_delivery_reason = _get_soft_delivery_reason(
+                    critic_payload=critic_payload,
+                    candidate_answer=latest_candidate_answer,
+                    evidence_pool=evidence_pool,
+                    retrieval_rounds=retrieval_rounds,
+                    tool_call_rounds=tool_call_rounds,
+                    critic_revise_followup_rounds=critic_revise_followup_rounds,
+                    budget_state=budget_state,
+                )
                 if budget_exceeded:
                     fallback_answer = _format_budget_guard_answer(
                         budget_guard_reason,
@@ -2642,6 +2807,12 @@ async def chat(request: ChatRequest):
                     fallback_answer = _format_answer_with_evidence(
                         latest_candidate_answer,
                         evidence_pool,
+                    )
+                elif soft_delivery_reason:
+                    fallback_answer = _format_bounded_answer_for_delivery(
+                        latest_candidate_answer,
+                        evidence_pool,
+                        soft_reason=soft_delivery_reason,
                     )
                 else:
                     fallback_answer = _format_insufficient_evidence_answer(

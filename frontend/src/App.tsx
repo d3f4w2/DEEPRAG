@@ -9,6 +9,8 @@ import type {
   ReasoningStageMetric,
   RetrievalCritic,
   StreamChunk,
+  ToolCall,
+  ToolResult,
 } from './types';
 import ChatMessage from './components/ChatMessage';
 import SystemPromptPanel from './components/SystemPromptPanel';
@@ -167,8 +169,8 @@ function App() {
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
-  const [messageToolCalls, setMessageToolCalls] = useState<Map<number, any[]>>(new Map());
-  const [messageToolResults, setMessageToolResults] = useState<Map<number, any[]>>(new Map());
+  const [messageToolCalls, setMessageToolCalls] = useState<Map<number, ToolCall[]>>(new Map());
+  const [messageToolResults, setMessageToolResults] = useState<Map<number, ToolResult[]>>(new Map());
   const [messageReasoningStages, setMessageReasoningStages] = useState<Map<number, ReasoningStage[]>>(new Map());
   const [messageRetrievalCritic, setMessageRetrievalCritic] = useState<Map<number, RetrievalCritic>>(new Map());
   const [messageBudgetSummary, setMessageBudgetSummary] = useState<Map<number, BudgetSummary>>(new Map());
@@ -313,7 +315,9 @@ function App() {
       const decoder = new TextDecoder();
       let assistantMessage = '';
       let toolCallsInfo = '';
-      let currentToolCalls: any[] = [];
+      let currentToolCalls: ToolCall[] = [];
+      let aggregatedToolCalls: ToolCall[] = [];
+      let aggregatedToolResults: ToolResult[] = [];
       let hasToolCall = false;
       let buffer = '';
       let latestCritic: RetrievalCritic | null = null;
@@ -389,12 +393,27 @@ function App() {
                           return newMap;
                         });
                       }
+                      if (aggregatedToolCalls.length > 0 && targetMessageIndex >= 0) {
+                        setMessageToolCalls((prevToolCalls) => {
+                          const newMap = new Map(prevToolCalls);
+                          newMap.set(targetMessageIndex, [...aggregatedToolCalls]);
+                          return newMap;
+                        });
+                      }
+                      if (aggregatedToolResults.length > 0 && targetMessageIndex >= 0) {
+                        setMessageToolResults((prevResults) => {
+                          const newMap = new Map(prevResults);
+                          newMap.set(targetMessageIndex, [...aggregatedToolResults]);
+                          return newMap;
+                        });
+                      }
                       return newMessages;
                     });
                   }
                 } else if (parsed.type === 'tool_calls' && parsed.tool_calls) {
                   hasToolCall = true;
                   currentToolCalls = parsed.tool_calls;
+                  aggregatedToolCalls = [...aggregatedToolCalls, ...parsed.tool_calls];
                   toolCallsInfo = `${TOOL_STATUS_PREFIX} Retrieving evidence...`;
 
                   setMessages((prev) => {
@@ -414,6 +433,7 @@ function App() {
                     return newMessages;
                   });
                 } else if (parsed.type === 'tool_results' && parsed.results) {
+                  aggregatedToolResults = [...aggregatedToolResults, ...(parsed.results || [])];
                   setMessages((prev) => {
                     const messageIndex = prev.length - 1;
                     setMessageToolResults((prevResults) => {
@@ -568,6 +588,20 @@ function App() {
                         setMessageBudgetSummary((prevBudgetMap) => {
                           const newMap = new Map(prevBudgetMap);
                           newMap.set(targetMessageIndex, latestBudgetSummary as BudgetSummary);
+                          return newMap;
+                        });
+                      }
+                      if (aggregatedToolCalls.length > 0 && targetMessageIndex >= 0) {
+                        setMessageToolCalls((prevToolCalls) => {
+                          const newMap = new Map(prevToolCalls);
+                          newMap.set(targetMessageIndex, [...aggregatedToolCalls]);
+                          return newMap;
+                        });
+                      }
+                      if (aggregatedToolResults.length > 0 && targetMessageIndex >= 0) {
+                        setMessageToolResults((prevResults) => {
+                          const newMap = new Map(prevResults);
+                          newMap.set(targetMessageIndex, [...aggregatedToolResults]);
                           return newMap;
                         });
                       }

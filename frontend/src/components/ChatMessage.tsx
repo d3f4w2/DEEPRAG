@@ -2,14 +2,14 @@
 import { User, Bot, ChevronDown, ChevronRight, Wrench, FileText, Copy, Check, Sparkles, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { BudgetSummary, Message, ReasoningStage, RetrievalCritic } from '../types';
+import type { BudgetSummary, Message, ReasoningStage, RetrievalCritic, ToolCall, ToolResult } from '../types';
 import { API_BASE_URL } from '../api';
 import './ChatMessage.css';
 
 interface ChatMessageProps {
   message: Message;
-  toolCalls?: any[];
-  toolResults?: any[];
+  toolCalls?: ToolCall[];
+  toolResults?: ToolResult[];
   reasoningStages?: ReasoningStage[];
   retrievalCritic?: RetrievalCritic;
   budgetSummary?: BudgetSummary;
@@ -26,10 +26,59 @@ interface ParsedAssistantAnswer {
   evidenceItems: EvidenceItem[];
 }
 
+interface RetrievalCandidate {
+  path: string;
+  score: number;
+  summary: string;
+  matchMode?: string;
+  lexicalScore?: number;
+  vectorScore?: number;
+}
+
+interface RetrievalSectionHit {
+  filePath: string;
+  section: number;
+  score: number;
+  heading: string;
+  snippet: string;
+}
+
+interface SearchRoundView {
+  toolCallId: string;
+  query: string;
+  topK: number;
+  candidates: RetrievalCandidate[];
+}
+
+interface SectionRoundView {
+  toolCallId: string;
+  query: string;
+  targets: string[];
+  maxSectionsPerFile: number;
+  hits: RetrievalSectionHit[];
+}
+
+interface RetrievalTraceView {
+  searchRounds: SearchRoundView[];
+  sectionRounds: SectionRoundView[];
+  totalCandidates: number;
+  totalSectionHits: number;
+  hybridCandidateCount: number;
+}
+
 const EVIDENCE_HEADER_REGEX = /(?:^|\n)#{2,3}\s*(证据|evidence)\s*\n/i;
+const SECTION_BLOCK_REGEX =
+  /\[\[FILE:(?<path>.+?)\s*\|\s*SECTION:(?<section>\d+)\s*\|\s*SCORE:(?<score>-?\d+(?:\.\d+)?)\s*\|\s*HEADING:(?<heading>.*?)\]\]\s*(?<body>.*?)(?=(?:\n\n==========\n\n|\n\n----------\n\n|$))/gs;
 type StageStatus = 'pending' | 'running' | 'completed' | 'failed';
 type JudgeDecision = 'accept' | 'revise' | 'refuse';
 type JudgeTone = 'pass' | 'hold' | 'reject';
+
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+};
 
 const buildKnowledgeFileUrl = (relativePath: string): string => {
   const normalized = (relativePath || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
@@ -96,6 +145,166 @@ const parseAssistantAnswerWithEvidence = (content: string): ParsedAssistantAnswe
   return {
     answerText: answerText || content.trim(),
     evidenceItems,
+  };
+};
+
+const parseToolArguments = (toolCall: ToolCall): Record<string, unknown> => {
+  try {
+    const raw = toolCall?.function?.arguments || '{}';
+    return asRecord(JSON.parse(raw)) || {};
+  } catch {
+    return {};
+  }
+};
+
+const parseSearchRoundFromToolTrace = (toolCall: ToolCall, toolResult: ToolResult): SearchRoundView | null => {
+  if (toolCall?.function?.name !== 'search_paths') {
+    return null;
+  }
+
+  const args = parseToolArguments(toolCall);
+  const content = String(toolResult?.content || '').trim();
+  if (!content) {
+    return null;
+  }
+
+  try {
+    const parsed = asRecord(JSON.parse(content));
+    if (!parsed) {
+      return null;
+    }
+    const rawCandidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+    const candidates = rawCandidates.reduce<RetrievalCandidate[]>((acc, item) => {
+      const record = asRecord(item);
+      if (!record) {
+        return acc;
+      }
+
+      const path = String(record.path ?? '').trim();
+      if (!path) {
+        return acc;
+      }
+
+      acc.push({
+        path,
+        score: Number(record.score || 0),
+        summary: String(record.summary || '').trim(),
+        matchMode: String(record.match_mode || '').trim() || undefined,
+        lexicalScore:
+          typeof record.lexical_score === 'number' ? Number(record.lexical_score) : undefined,
+        vectorScore:
+          typeof record.vector_score === 'number' ? Number(record.vector_score) : undefined,
+      });
+      return acc;
+    }, []);
+
+    return {
+      toolCallId: String(toolCall?.id || ''),
+      query: String(args.query || '').trim(),
+      topK: Number(args.top_k || 0),
+      candidates,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const parseSectionRoundFromToolTrace = (
+  toolCall: ToolCall,
+  toolResult: ToolResult,
+): SectionRoundView | null => {
+  if (toolCall?.function?.name !== 'retrieve_sections') {
+    return null;
+  }
+
+  const args = parseToolArguments(toolCall);
+  const content = String(toolResult?.content || '');
+  if (!content.trim()) {
+    return null;
+  }
+
+  const hits: RetrievalSectionHit[] = [];
+  for (const match of content.matchAll(SECTION_BLOCK_REGEX)) {
+    const groups = match.groups || {};
+    const filePath = String(groups.path || '').trim();
+    const snippet = String(groups.body || '')
+      .replace(/\n+/g, ' ')
+      .trim();
+    if (!filePath || !snippet) {
+      continue;
+    }
+    hits.push({
+      filePath,
+      section: Number(groups.section || 0),
+      score: Number(groups.score || 0),
+      heading: String(groups.heading || '').trim() || 'section',
+      snippet,
+    });
+  }
+
+  return {
+    toolCallId: String(toolCall?.id || ''),
+    query: String(args.query || '').trim(),
+    targets: Array.isArray(args.file_paths)
+      ? args.file_paths.reduce<string[]>((acc, item) => {
+          const value = String(item || '').trim();
+          if (value) {
+            acc.push(value);
+          }
+          return acc;
+        }, [])
+      : [],
+    maxSectionsPerFile: Number(args.max_sections_per_file || 0),
+    hits,
+  };
+};
+
+const buildRetrievalTraceView = (
+  toolCalls?: ToolCall[],
+  toolResults?: ToolResult[],
+): RetrievalTraceView | null => {
+  if (!Array.isArray(toolCalls) || !Array.isArray(toolResults) || toolCalls.length === 0) {
+    return null;
+  }
+
+  const searchRounds: SearchRoundView[] = [];
+  const sectionRounds: SectionRoundView[] = [];
+
+  toolCalls.forEach((toolCall, index) => {
+    const toolResult = toolResults[index];
+    if (!toolResult) {
+      return;
+    }
+
+    const searchRound = parseSearchRoundFromToolTrace(toolCall, toolResult);
+    if (searchRound) {
+      searchRounds.push(searchRound);
+      return;
+    }
+
+    const sectionRound = parseSectionRoundFromToolTrace(toolCall, toolResult);
+    if (sectionRound) {
+      sectionRounds.push(sectionRound);
+    }
+  });
+
+  if (searchRounds.length === 0 && sectionRounds.length === 0) {
+    return null;
+  }
+
+  return {
+    searchRounds,
+    sectionRounds,
+    totalCandidates: searchRounds.reduce((sum, round) => sum + round.candidates.length, 0),
+    totalSectionHits: sectionRounds.reduce((sum, round) => sum + round.hits.length, 0),
+    hybridCandidateCount: searchRounds.reduce(
+      (sum, round) =>
+        sum +
+        round.candidates.filter(
+          (candidate) => candidate.matchMode === 'hybrid' || candidate.matchMode === 'vector',
+        ).length,
+      0,
+    ),
   };
 };
 
@@ -331,6 +540,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 }) => {
   const isUser = message.role === 'user';
   const [isToolCallExpanded, setIsToolCallExpanded] = useState(true);
+  const [isTraceExpanded, setIsTraceExpanded] = useState(true);
   const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -341,6 +551,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     : null;
   const evidenceItems = parsedAssistantAnswer?.evidenceItems || [];
   const hasEvidenceItems = evidenceItems.length > 0;
+  const retrievalTrace = React.useMemo(
+    () => buildRetrievalTraceView(toolCalls, toolResults),
+    [toolCalls, toolResults],
+  );
   const resolvedStages = reasoningStages && reasoningStages.length > 0
     ? sortReasoningStages(reasoningStages)
     : fallbackCriticStage(retrievalCritic);
@@ -432,7 +646,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                           </div>
                         </div>
                       );
-                    } catch (e) {
+                    } catch {
                       return null;
                     }
                   })}
@@ -591,6 +805,121 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                       <span className="budget-summary-reason" title={budgetSummary.reason}>
                         {budgetReasonSummary}
                       </span>
+                    )}
+                  </div>
+                )}
+                {retrievalTrace && (
+                  <div className="retrieval-trace-panel">
+                    <div
+                      className="retrieval-trace-header"
+                      onClick={() => setIsTraceExpanded((prev) => !prev)}
+                    >
+                      <div className="retrieval-trace-title">
+                        <FileText size={14} />
+                        <span>检索 / 证据轨迹</span>
+                      </div>
+                      <div className="retrieval-trace-summary">
+                        <span className="retrieval-trace-chip">
+                          路径轮次 {retrievalTrace.searchRounds.length}
+                        </span>
+                        <span className="retrieval-trace-chip">
+                          证据轮次 {retrievalTrace.sectionRounds.length}
+                        </span>
+                        <span className="retrieval-trace-chip">
+                          候选 {retrievalTrace.totalCandidates}
+                        </span>
+                        <span className="retrieval-trace-chip">
+                          片段 {retrievalTrace.totalSectionHits}
+                        </span>
+                        {retrievalTrace.hybridCandidateCount > 0 && (
+                          <span className="retrieval-trace-chip accent">
+                            Hybrid {retrievalTrace.hybridCandidateCount}
+                          </span>
+                        )}
+                        {isTraceExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </div>
+                    </div>
+                    {isTraceExpanded && (
+                      <div className="retrieval-trace-body">
+                        {retrievalTrace.searchRounds.length > 0 && (
+                          <div className="retrieval-trace-section">
+                            <div className="retrieval-trace-section-title">候选路径</div>
+                            <div className="retrieval-trace-round-list">
+                              {retrievalTrace.searchRounds.map((round, roundIndex) => (
+                                <div key={`${round.toolCallId || 'search'}-${roundIndex}`} className="retrieval-round-card">
+                                  <div className="retrieval-round-head">
+                                    <span className="retrieval-round-label">search_paths #{roundIndex + 1}</span>
+                                    <span className="retrieval-round-meta">
+                                      Query: {round.query || 'n/a'} · TopK {round.topK || round.candidates.length}
+                                    </span>
+                                  </div>
+                                  <div className="retrieval-candidate-list">
+                                    {round.candidates.slice(0, 5).map((candidate, candidateIndex) => (
+                                      <div
+                                        key={`${candidate.path}-${candidateIndex}`}
+                                        className="retrieval-candidate-item"
+                                      >
+                                        <div className="retrieval-candidate-path">{candidate.path}</div>
+                                        <div className="retrieval-candidate-meta">
+                                          <span>score {candidate.score.toFixed(3)}</span>
+                                          {candidate.matchMode && <span>{candidate.matchMode}</span>}
+                                          {typeof candidate.vectorScore === 'number' && (
+                                            <span>vec {candidate.vectorScore.toFixed(3)}</span>
+                                          )}
+                                        </div>
+                                        {candidate.summary && (
+                                          <div className="retrieval-candidate-summary">{candidate.summary}</div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {retrievalTrace.sectionRounds.length > 0 && (
+                          <div className="retrieval-trace-section">
+                            <div className="retrieval-trace-section-title">证据片段</div>
+                            <div className="retrieval-trace-round-list">
+                              {retrievalTrace.sectionRounds.map((round, roundIndex) => (
+                                <div key={`${round.toolCallId || 'section'}-${roundIndex}`} className="retrieval-round-card">
+                                  <div className="retrieval-round-head">
+                                    <span className="retrieval-round-label">retrieve_sections #{roundIndex + 1}</span>
+                                    <span className="retrieval-round-meta">
+                                      Query: {round.query || 'n/a'} · Files {round.targets.length} · Sections/File{' '}
+                                      {round.maxSectionsPerFile || 'n/a'}
+                                    </span>
+                                  </div>
+                                  {round.targets.length > 0 && (
+                                    <div className="retrieval-target-badges">
+                                      {round.targets.slice(0, 5).map((target, targetIndex) => (
+                                        <span key={`${target}-${targetIndex}`} className="retrieval-target-badge">
+                                          {target}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="retrieval-section-list">
+                                    {round.hits.slice(0, 4).map((hit, hitIndex) => (
+                                      <div key={`${hit.filePath}-${hit.section}-${hitIndex}`} className="retrieval-section-item">
+                                        <div className="retrieval-section-source">
+                                          <span>{hit.filePath}</span>
+                                          <span>
+                                            Section {hit.section} · score {hit.score.toFixed(2)}
+                                          </span>
+                                        </div>
+                                        <div className="retrieval-section-heading">{hit.heading}</div>
+                                        <div className="retrieval-section-snippet">{hit.snippet}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

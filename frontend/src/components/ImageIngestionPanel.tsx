@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ImagePlus, RefreshCw, Save, Upload } from 'lucide-react';
 import axios from 'axios';
 import { imageApi } from '../api';
@@ -7,6 +7,15 @@ import './ImageIngestionPanel.css';
 
 type ImageIngestionPanelProps = {
   provider: string;
+};
+
+type ApiValidationIssue = {
+  msg?: string;
+  [key: string]: unknown;
+};
+
+type ApiErrorBody = {
+  detail?: string | ApiValidationIssue[] | ApiValidationIssue;
 };
 
 const nowIsoLocal = () => new Date().toISOString();
@@ -22,7 +31,7 @@ const revokeObjectUrl = (url: string) => {
 
 const parseApiError = (error: unknown, fallback: string) => {
   if (axios.isAxiosError(error)) {
-    const detail = (error.response?.data as any)?.detail;
+    const detail = (error.response?.data as ApiErrorBody | undefined)?.detail;
     if (typeof detail === 'string' && detail.trim()) {
       return detail;
     }

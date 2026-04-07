@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 import os
 from dotenv import load_dotenv
@@ -7,7 +7,13 @@ load_dotenv()
 
 class Settings(BaseSettings):
     """Core configuration class - all settings loaded from .env with defaults"""
-    
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="allow",
+    )
+
     api_provider: str = Field(default="google")
     tool_calling_mode: str = Field(default="function")
     temperature: float = Field(default=0.0)
@@ -15,14 +21,6 @@ class Settings(BaseSettings):
     knowledge_base: str = Field(default="./Knowledge-Base")
     knowledge_base_chunks: str = Field(default="./Knowledge-Base")
     knowledge_base_file_summary: str = Field(default="./Knowledge-Base-File-Summary/summary.txt")
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        extra = "allow"
-    
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_provider_config(self, provider: str) -> dict:
         """Dynamically get provider configuration from .env"""

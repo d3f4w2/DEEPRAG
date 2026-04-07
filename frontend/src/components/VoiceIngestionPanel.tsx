@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Mic, RefreshCw, Save } from 'lucide-react';
 import axios from 'axios';
 import { voiceApi } from '../api';
@@ -9,20 +9,51 @@ type VoiceIngestionPanelProps = {
   provider: string;
 };
 
+type ApiValidationIssue = {
+  msg?: string;
+  [key: string]: unknown;
+};
+
+type ApiErrorBody = {
+  detail?: string | ApiValidationIssue[] | ApiValidationIssue;
+};
+
+type SpeechRecognitionAlternativeLike = {
+  transcript?: string;
+};
+
+type SpeechRecognitionResultLike = ArrayLike<SpeechRecognitionAlternativeLike> & {
+  isFinal?: boolean;
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex?: number;
+  results?: ArrayLike<SpeechRecognitionResultLike>;
+};
+
+type SpeechRecognitionErrorEventLike = {
+  error?: string;
+};
+
 type RecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onstart: (() => void) | null;
-  onresult: ((event: any) => void) | null;
-  onerror: ((event: any) => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
 };
 
+type RecognitionHostWindow = Window & typeof globalThis & {
+  SpeechRecognition?: new () => RecognitionLike;
+  webkitSpeechRecognition?: new () => RecognitionLike;
+};
+
 const getRecognitionCtor = (): (new () => RecognitionLike) | null => {
-  const win = window as any;
+  const win = window as RecognitionHostWindow;
   return win.SpeechRecognition || win.webkitSpeechRecognition || null;
 };
 
@@ -30,7 +61,7 @@ const nowIsoLocal = () => new Date().toISOString();
 
 const parseApiError = (error: unknown, fallback: string) => {
   if (axios.isAxiosError(error)) {
-    const detail = (error.response?.data as any)?.detail;
+    const detail = (error.response?.data as ApiErrorBody | undefined)?.detail;
     if (typeof detail === 'string' && detail.trim()) {
       return detail;
     }
@@ -133,6 +164,10 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
     }
   };
 
+  const requestDraftFromEffect = useEffectEvent((transcript: string) => {
+    void requestDraft(transcript, false, true);
+  });
+
   useEffect(() => {
     const Ctor = getRecognitionCtor();
     if (!Ctor) {
@@ -148,14 +183,18 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       setIsRecording(true);
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       try {
         const results = event?.results;
         if (!results || typeof results.length !== 'number') {
           return;
         }
 
-        const safeStart = Number.isInteger(event?.resultIndex) ? Math.max(0, event.resultIndex) : 0;
+        const resultIndex = event?.resultIndex;
+        const safeStart =
+          typeof resultIndex === 'number' && Number.isInteger(resultIndex)
+            ? Math.max(0, resultIndex)
+            : 0;
         let finalPart = '';
         let interimPart = '';
 
@@ -165,7 +204,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
           if (!segment) {
             continue;
           }
-          if (Boolean(current?.isFinal)) {
+          if (current?.isFinal) {
             finalPart += ` ${segment}`;
           } else {
             interimPart += ` ${segment}`;
@@ -182,7 +221,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       }
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
       setErrorMessage(`Speech recognition error: ${event?.error || 'unknown'}`);
       setIsRecording(false);
     };
@@ -196,7 +235,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
     return () => {
       try {
         recognition.stop();
-      } catch (_e) {
+      } catch {
         // ignore stop error during unmount
       }
       recognitionRef.current = null;
@@ -208,10 +247,10 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       return;
     }
     const timer = window.setTimeout(() => {
-      void requestDraft(liveTranscript, false, true);
+      requestDraftFromEffect(liveTranscript);
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [liveTranscript, author, provider]);
+  }, [liveTranscript, requestDraftFromEffect]);
 
   const handleStartRecording = () => {
     if (!recognitionRef.current) {

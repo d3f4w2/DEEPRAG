@@ -61,3 +61,7 @@ frontend.log
 
 .vscode/
 .paddle_cache/
+tests/_tmp/
+pytest-cache-files-*/
+Knowledge-Base-File-Summary/retrieval_embedding_cache.json
+Knowledge-Base-File-Summary/retrieval_section_embedding_cache.json

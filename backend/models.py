@@ -20,10 +20,15 @@ class ChatRequest(BaseModel):
     budget: Optional[ChatBudgetConfig] = None
 
 class FileRetrievalRequest(BaseModel):
-    file_paths: List[str] = Field(..., example=[
-        "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md",
-        "2023-Market-Layout/"
-    ])
+    file_paths: List[str] = Field(
+        ...,
+        json_schema_extra={
+            "example": [
+                "Product-Line-A-Smartwatch-Series/SW-2100-Flagship.md",
+                "2023-Market-Layout/",
+            ]
+        },
+    )
 
 class FileRetrievalResponse(BaseModel):
     content: str

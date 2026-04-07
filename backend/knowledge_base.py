@@ -1,12 +1,51 @@
 import json
 import os
 import re
+import hashlib
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import aiofiles
+import httpx
 
 from backend.config import settings
+
+
+ENGLISH_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "how",
+    "in",
+    "into",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "this",
+    "to",
+    "was",
+    "were",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+    "without",
+}
 
 
 class KnowledgeBase:
@@ -23,7 +62,54 @@ class KnowledgeBase:
         self.max_section_chars = int(os.getenv("MAX_SECTION_CHARS", "1200"))
         self.max_section_total_chars = int(os.getenv("MAX_SECTION_TOTAL_CHARS", "9000"))
         self.max_search_top_k = int(os.getenv("MAX_SEARCH_TOP_K", "10"))
+        self.enable_hybrid_search = (
+            os.getenv("ENABLE_HYBRID_SEARCH", "true").strip().lower() in {"1", "true", "yes", "on"}
+        )
+        self.hybrid_lexical_weight = max(
+            0.0, float(os.getenv("HYBRID_LEXICAL_WEIGHT", "0.65") or 0.65)
+        )
+        self.hybrid_vector_weight = max(
+            0.0, float(os.getenv("HYBRID_VECTOR_WEIGHT", "0.35") or 0.35)
+        )
+        if self.hybrid_lexical_weight <= 0 and self.hybrid_vector_weight <= 0:
+            self.hybrid_lexical_weight = 1.0
+        self.min_vector_score = max(
+            0.0, float(os.getenv("MIN_VECTOR_SCORE", "0.2") or 0.2)
+        )
+        self.embedding_timeout_sec = max(
+            5.0, float(os.getenv("RETRIEVAL_EMBEDDING_TIMEOUT_SEC", "20") or 20)
+        )
+        self.embedding_batch_size = max(
+            1, min(int(os.getenv("RETRIEVAL_EMBEDDING_BATCH_SIZE", "16") or 16), 64)
+        )
+        self.enable_hybrid_section_search = (
+            os.getenv("ENABLE_HYBRID_SECTION_SEARCH", "true").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self.hybrid_section_lexical_weight = max(
+            0.0, float(os.getenv("HYBRID_SECTION_LEXICAL_WEIGHT", "0.55") or 0.55)
+        )
+        self.hybrid_section_vector_weight = max(
+            0.0, float(os.getenv("HYBRID_SECTION_VECTOR_WEIGHT", "0.45") or 0.45)
+        )
+        if self.hybrid_section_lexical_weight <= 0 and self.hybrid_section_vector_weight <= 0:
+            self.hybrid_section_lexical_weight = 1.0
+        self.min_section_vector_score = max(
+            0.0, float(os.getenv("MIN_SECTION_VECTOR_SCORE", "0.16") or 0.16)
+        )
+        self.retrieval_embedding_provider = os.getenv(
+            "RETRIEVAL_EMBEDDING_PROVIDER", ""
+        ).strip()
+        self.retrieval_embedding_model_override = os.getenv(
+            "RETRIEVAL_EMBEDDING_MODEL", ""
+        ).strip()
+        self.embedding_cache_file = self.summary_file.parent / "retrieval_embedding_cache.json"
+        self.section_embedding_cache_file = (
+            self.summary_file.parent / "retrieval_section_embedding_cache.json"
+        )
         self._summary_index_cache: List[Dict[str, str]] | None = None
+        self._embedding_cache_state: Dict[str, Any] | None = None
+        self._section_embedding_cache_state: Dict[str, Any] | None = None
 
     async def get_file_summary(self) -> str:
         """
@@ -50,6 +136,8 @@ class KnowledgeBase:
         terms: set[str] = set()
 
         for token in re.findall(r"[a-z0-9][a-z0-9._-]{1,}", normalized):
+            if token in ENGLISH_STOPWORDS:
+                continue
             terms.add(token)
 
         # Capture Chinese words as bi-grams to get lightweight lexical matching
@@ -90,6 +178,355 @@ class KnowledgeBase:
         self._summary_index_cache = entries
         return entries
 
+    def _build_embeddings_url(self, base_url: str) -> str:
+        normalized = str(base_url or "").strip()
+        if not normalized:
+            return ""
+        if normalized.endswith("/embeddings"):
+            return normalized
+        if "/chat/completions" in normalized:
+            return normalized.replace("/chat/completions", "/embeddings")
+        return f"{normalized.rstrip('/')}/embeddings"
+
+    def _get_retrieval_embedding_config(self) -> Dict[str, Any] | None:
+        if not self.enable_hybrid_search:
+            return None
+
+        provider_name = self.retrieval_embedding_provider
+        if not provider_name:
+            ragas_cfg = settings.get_provider_config("ragas_embedding")
+            if ragas_cfg.get("api_key") and (ragas_cfg.get("base_url") or ragas_cfg.get("model")):
+                provider_name = "ragas_embedding"
+
+        if not provider_name:
+            return None
+
+        cfg = settings.get_provider_config(provider_name)
+        api_key = str(cfg.get("api_key") or "").strip()
+        base_url = self._build_embeddings_url(str(cfg.get("base_url") or "").strip())
+        model = (
+            self.retrieval_embedding_model_override
+            or os.getenv(f"{provider_name.upper()}_EMBEDDING_MODEL", "").strip()
+            or os.getenv("RAGAS_EMBEDDING_MODEL", "").strip()
+            or str(cfg.get("model") or "").strip()
+        )
+        headers = cfg.get("headers") if isinstance(cfg.get("headers"), dict) else {}
+
+        if not api_key or not base_url or not model:
+            return None
+
+        return {
+            "provider": provider_name,
+            "api_key": api_key,
+            "url": base_url,
+            "model": model,
+            "headers": headers,
+        }
+
+    def _text_hash(self, text: str) -> str:
+        return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+    def _build_embedding_text(self, entry: Dict[str, str]) -> str:
+        path = str(entry.get("path") or "").strip()
+        summary = str(entry.get("summary") or "").strip()
+        return f"Path: {path}\nSummary: {summary}".strip()
+
+    def _load_embedding_cache(self) -> Dict[str, Any]:
+        if self._embedding_cache_state is not None:
+            return self._embedding_cache_state
+
+        empty_state: Dict[str, Any] = {"provider": "", "model": "", "entries": {}}
+        if self.embedding_cache_file.exists():
+            try:
+                with open(self.embedding_cache_file, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    provider = str(loaded.get("provider") or "").strip()
+                    model = str(loaded.get("model") or "").strip()
+                    entries = loaded.get("entries")
+                    if isinstance(entries, dict):
+                        empty_state = {
+                            "provider": provider,
+                            "model": model,
+                            "entries": entries,
+                        }
+            except Exception as e:
+                print(f"[WARN] Failed to load retrieval embedding cache: {e}")
+
+        self._embedding_cache_state = empty_state
+        return self._embedding_cache_state
+
+    def _ensure_embedding_cache_for_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        state = self._load_embedding_cache()
+        provider = str(config.get("provider") or "").strip()
+        model = str(config.get("model") or "").strip()
+        if state.get("provider") != provider or state.get("model") != model:
+            state = {"provider": provider, "model": model, "entries": {}}
+            self._embedding_cache_state = state
+        if not isinstance(state.get("entries"), dict):
+            state["entries"] = {}
+        return state
+
+    def _save_embedding_cache(self) -> None:
+        if self._embedding_cache_state is None:
+            return
+        try:
+            self.embedding_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.embedding_cache_file, "w", encoding="utf-8") as f:
+                json.dump(self._embedding_cache_state, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Failed to save retrieval embedding cache: {e}")
+
+    def _load_section_embedding_cache(self) -> Dict[str, Any]:
+        if self._section_embedding_cache_state is not None:
+            return self._section_embedding_cache_state
+
+        empty_state: Dict[str, Any] = {"provider": "", "model": "", "files": {}}
+        if self.section_embedding_cache_file.exists():
+            try:
+                with open(self.section_embedding_cache_file, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    provider = str(loaded.get("provider") or "").strip()
+                    model = str(loaded.get("model") or "").strip()
+                    files = loaded.get("files")
+                    if isinstance(files, dict):
+                        empty_state = {"provider": provider, "model": model, "files": files}
+            except Exception as e:
+                print(f"[WARN] Failed to load section embedding cache: {e}")
+
+        self._section_embedding_cache_state = empty_state
+        return self._section_embedding_cache_state
+
+    def _ensure_section_embedding_cache_for_config(
+        self, config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        state = self._load_section_embedding_cache()
+        provider = str(config.get("provider") or "").strip()
+        model = str(config.get("model") or "").strip()
+        if state.get("provider") != provider or state.get("model") != model:
+            state = {"provider": provider, "model": model, "files": {}}
+            self._section_embedding_cache_state = state
+        if not isinstance(state.get("files"), dict):
+            state["files"] = {}
+        return state
+
+    def _save_section_embedding_cache(self) -> None:
+        if self._section_embedding_cache_state is None:
+            return
+        try:
+            self.section_embedding_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.section_embedding_cache_file, "w", encoding="utf-8") as f:
+                json.dump(self._section_embedding_cache_state, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Failed to save section embedding cache: {e}")
+
+    def _vector_norm(self, vector: List[float]) -> float:
+        if not vector:
+            return 0.0
+        return math.sqrt(sum(float(v) * float(v) for v in vector))
+
+    def _cosine_similarity(self, left: List[float], right: List[float]) -> float:
+        if not left or not right or len(left) != len(right):
+            return 0.0
+        left_norm = self._vector_norm(left)
+        right_norm = self._vector_norm(right)
+        if left_norm <= 0 or right_norm <= 0:
+            return 0.0
+        dot = sum(float(a) * float(b) for a, b in zip(left, right))
+        return dot / (left_norm * right_norm)
+
+    async def _embed_texts(
+        self,
+        texts: List[str],
+        config: Dict[str, Any],
+    ) -> List[List[float]]:
+        if not texts:
+            return []
+
+        headers = {
+            "Content-Type": "application/json",
+            **(config.get("headers") or {}),
+        }
+        if config.get("api_key"):
+            headers["Authorization"] = f"Bearer {config['api_key']}"
+
+        payload = {"model": config["model"], "input": texts}
+        async with httpx.AsyncClient(timeout=self.embedding_timeout_sec) as client:
+            response = await client.post(config["url"], json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+        items = data.get("data")
+        if not isinstance(items, list):
+            raise ValueError("Embedding response missing data list.")
+
+        by_index: Dict[int, List[float]] = {}
+        for fallback_idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            index = item.get("index", fallback_idx)
+            try:
+                index = int(index)
+            except Exception:
+                index = fallback_idx
+            embedding = item.get("embedding")
+            if isinstance(embedding, list) and embedding:
+                by_index[index] = [float(v) for v in embedding]
+
+        if len(by_index) != len(texts):
+            raise ValueError(
+                f"Embedding response size mismatch: expected {len(texts)}, got {len(by_index)}"
+            )
+
+        return [by_index[i] for i in range(len(texts))]
+
+    async def _get_entry_embedding_vectors(
+        self,
+        entries: List[Dict[str, str]],
+        config: Dict[str, Any],
+    ) -> Dict[str, List[float]]:
+        state = self._ensure_embedding_cache_for_config(config)
+        cached_entries = state["entries"]
+        vectors: Dict[str, List[float]] = {}
+        missing: List[Tuple[str, str, str]] = []
+
+        for entry in entries:
+            path = str(entry.get("path") or "").strip()
+            if not path:
+                continue
+            text = self._build_embedding_text(entry)
+            text_hash = self._text_hash(text)
+            cached = cached_entries.get(path)
+            if (
+                isinstance(cached, dict)
+                and cached.get("text_hash") == text_hash
+                and isinstance(cached.get("embedding"), list)
+                and cached.get("embedding")
+            ):
+                vectors[path] = [float(v) for v in cached.get("embedding")]
+                continue
+            missing.append((path, text_hash, text))
+
+        updated = False
+        for start in range(0, len(missing), self.embedding_batch_size):
+            batch = missing[start : start + self.embedding_batch_size]
+            batch_vectors = await self._embed_texts([item[2] for item in batch], config)
+            for (path, text_hash, _), vector in zip(batch, batch_vectors):
+                cached_entries[path] = {"text_hash": text_hash, "embedding": vector}
+                vectors[path] = vector
+                updated = True
+
+        if updated:
+            self._save_embedding_cache()
+
+        return vectors
+
+    async def _compute_vector_scores(
+        self,
+        entries: List[Dict[str, str]],
+        query: str,
+    ) -> Dict[str, float]:
+        config = self._get_retrieval_embedding_config()
+        query_text = str(query or "").strip()
+        if not config or not query_text:
+            return {}
+
+        try:
+            query_embedding = (await self._embed_texts([query_text], config))[0]
+            entry_vectors = await self._get_entry_embedding_vectors(entries, config)
+        except Exception as e:
+            print(f"[WARN] Hybrid retrieval embeddings unavailable, fallback to lexical only: {e}")
+            return {}
+
+        scores: Dict[str, float] = {}
+        for path, vector in entry_vectors.items():
+            similarity = self._cosine_similarity(query_embedding, vector)
+            if similarity > 0:
+                scores[path] = similarity
+        return scores
+
+    def _build_section_embedding_text(self, heading: str, body: str) -> str:
+        return f"Heading: {heading.strip()}\nBody: {body.strip()}".strip()
+
+    async def _get_query_embedding(self, query: str) -> List[float]:
+        config = self._get_retrieval_embedding_config()
+        if not config or not query.strip():
+            return []
+        try:
+            return (await self._embed_texts([query.strip()], config))[0]
+        except Exception as e:
+            print(f"[WARN] Query embedding unavailable, fallback to lexical sections: {e}")
+            return []
+
+    async def _get_section_embedding_vectors(
+        self,
+        *,
+        file_path: Path,
+        content: str,
+        sections: List[Tuple[str, str]],
+        config: Dict[str, Any],
+    ) -> List[List[float]]:
+        if not sections:
+            return []
+
+        state = self._ensure_section_embedding_cache_for_config(config)
+        files = state["files"]
+        file_key = str(file_path.resolve()).replace("\\", "/").lower()
+        content_hash = self._text_hash(content)
+        cached = files.get(file_key)
+        section_records = []
+        if isinstance(cached, dict) and cached.get("content_hash") == content_hash:
+            raw_sections = cached.get("sections")
+            if isinstance(raw_sections, list):
+                section_records = raw_sections
+
+        vectors: List[List[float]] = []
+        missing_indices: List[int] = []
+        for idx, (heading, body) in enumerate(sections):
+            section_text = self._build_section_embedding_text(heading, body)
+            section_hash = self._text_hash(section_text)
+            cached_item = section_records[idx] if idx < len(section_records) else None
+            if (
+                isinstance(cached_item, dict)
+                and cached_item.get("section_hash") == section_hash
+                and isinstance(cached_item.get("embedding"), list)
+                and cached_item.get("embedding")
+            ):
+                vectors.append([float(v) for v in cached_item.get("embedding")])
+            else:
+                vectors.append([])
+                missing_indices.append(idx)
+
+        updated = False
+        for start in range(0, len(missing_indices), self.embedding_batch_size):
+            batch_indices = missing_indices[start : start + self.embedding_batch_size]
+            batch_texts = [
+                self._build_section_embedding_text(sections[idx][0], sections[idx][1])
+                for idx in batch_indices
+            ]
+            batch_vectors = await self._embed_texts(batch_texts, config)
+            for idx, vector in zip(batch_indices, batch_vectors):
+                vectors[idx] = vector
+                updated = True
+
+        if updated or not section_records:
+            files[file_key] = {
+                "content_hash": content_hash,
+                "sections": [
+                    {
+                        "section_hash": self._text_hash(
+                            self._build_section_embedding_text(heading, body)
+                        ),
+                        "embedding": vectors[idx],
+                    }
+                    for idx, (heading, body) in enumerate(sections)
+                ],
+            }
+            self._save_section_embedding_cache()
+
+        return vectors
+
     def update_summary_entry(self, relative_path: str, summary: str) -> None:
         """Update or create one path entry in summary_demo.json for searchable ingestion."""
         path_key = (relative_path or "").strip().replace("\\", "/").lstrip("/")
@@ -113,6 +550,8 @@ class KnowledgeBase:
 
         # Force reload on next search_paths call.
         self._summary_index_cache = None
+        self._embedding_cache_state = None
+        self._section_embedding_cache_state = None
 
     async def search_paths(self, query: str, top_k: int = 5) -> str:
         entries = self._load_summary_index()
@@ -122,24 +561,54 @@ class KnowledgeBase:
         safe_top_k = max(1, min(int(top_k or 5), self.max_search_top_k))
         query_terms = self._extract_terms(query)
         query_text = (query or "").lower()
-        scored: List[Tuple[float, Dict[str, str]]] = []
+        vector_scores = await self._compute_vector_scores(entries, query)
+        lexical_scores: Dict[str, float] = {}
 
         for entry in entries:
             corpus = f"{entry['path']} {entry['summary']}".lower()
             corpus_terms = self._extract_terms(corpus)
             overlap = query_terms & corpus_terms
 
-            score = float(len(overlap) * 3)
+            lexical_score = float(len(overlap) * 3)
             for term in query_terms:
                 if len(term) >= 2 and term in corpus:
-                    score += 1.2
+                    lexical_score += 1.2
 
             # Slight preference for leaf files over directories in candidate list.
-            if entry["path"].endswith(".md"):
-                score += 0.2
+            if lexical_score > 0 and entry["path"].endswith(".md"):
+                lexical_score += 0.2
 
-            if score > 0:
-                scored.append((score, entry))
+            lexical_scores[entry["path"]] = lexical_score
+
+        max_lexical_score = max(lexical_scores.values()) if lexical_scores else 0.0
+        scored: List[Tuple[float, float, float, str, Dict[str, str]]] = []
+        for entry in entries:
+            path = entry["path"]
+            lexical_score = lexical_scores.get(path, 0.0)
+            vector_score = max(0.0, float(vector_scores.get(path, 0.0)))
+            lexical_norm = (
+                lexical_score / max_lexical_score if max_lexical_score > 0 else 0.0
+            )
+            hybrid_score = (
+                lexical_norm * self.hybrid_lexical_weight
+                + vector_score * self.hybrid_vector_weight
+            )
+            if lexical_score > 0 or vector_score >= self.min_vector_score:
+                if lexical_score > 0 and vector_score >= self.min_vector_score:
+                    match_mode = "hybrid"
+                elif vector_score >= self.min_vector_score:
+                    match_mode = "vector"
+                else:
+                    match_mode = "lexical"
+                scored.append((hybrid_score, lexical_score, vector_score, match_mode, entry))
+
+        if not scored and vector_scores:
+            for entry in entries:
+                path = entry["path"]
+                vector_score = max(0.0, float(vector_scores.get(path, 0.0)))
+                if vector_score <= 0:
+                    continue
+                scored.append((vector_score, 0.0, vector_score, "vector", entry))
 
         if not scored:
             # Fallback: if lexical overlap is empty, return first files so the model
@@ -154,16 +623,19 @@ class KnowledgeBase:
                 ensure_ascii=False,
             )
 
-        scored.sort(key=lambda x: (-x[0], x[1]["path"]))
+        scored.sort(key=lambda x: (-x[0], -x[1], -x[2], x[4]["path"]))
         candidates = []
-        for score, entry in scored[:safe_top_k]:
-            candidates.append(
-                {
-                    "path": entry["path"],
-                    "score": round(score, 3),
-                    "summary": entry["summary"][:260],
-                }
-            )
+        for hybrid_score, lexical_score, vector_score, match_mode, entry in scored[:safe_top_k]:
+            candidate = {
+                "path": entry["path"],
+                "score": round(hybrid_score, 3),
+                "summary": entry["summary"][:260],
+            }
+            if self.enable_hybrid_search and vector_scores:
+                candidate["match_mode"] = match_mode
+                candidate["lexical_score"] = round(lexical_score, 3)
+                candidate["vector_score"] = round(vector_score, 4)
+            candidates.append(candidate)
 
         return json.dumps(
             {"query": query_text, "top_k": safe_top_k, "candidates": candidates},
@@ -182,6 +654,12 @@ class KnowledgeBase:
             return "No matching files found for provided paths."
 
         query_terms = self._extract_terms(query)
+        embedding_config = (
+            self._get_retrieval_embedding_config() if self.enable_hybrid_section_search else None
+        )
+        query_embedding: List[float] = []
+        if embedding_config:
+            query_embedding = await self._get_query_embedding(query)
         results: List[str] = []
         notes: List[str] = []
         total_chars = 0
@@ -190,7 +668,27 @@ class KnowledgeBase:
         for file_path in resolved_files:
             content = await self._read_file(file_path)
             sections = self._split_into_sections(content)
-            ranked_sections = self._rank_sections(sections, query_terms)
+            section_vectors: List[List[float]] = []
+            if embedding_config and query_embedding:
+                try:
+                    section_vectors = await self._get_section_embedding_vectors(
+                        file_path=file_path,
+                        content=content,
+                        sections=sections,
+                        config=embedding_config,
+                    )
+                except Exception as e:
+                    print(
+                        f"[WARN] Section embeddings unavailable for {file_path.name}, "
+                        f"fallback to lexical ranking: {e}"
+                    )
+                    section_vectors = []
+            ranked_sections = self._rank_sections(
+                sections,
+                query_terms,
+                query_embedding=query_embedding,
+                section_vectors=section_vectors,
+            )
             selected = ranked_sections[:safe_max_sections]
 
             for section_idx, (score, heading, body) in enumerate(selected, start=1):
@@ -267,17 +765,55 @@ class KnowledgeBase:
         return chunks
 
     def _rank_sections(
-        self, sections: List[Tuple[str, str]], query_terms: set[str]
+        self,
+        sections: List[Tuple[str, str]],
+        query_terms: set[str],
+        *,
+        query_embedding: List[float] | None = None,
+        section_vectors: List[List[float]] | None = None,
     ) -> List[Tuple[float, str, str]]:
         ranked: List[Tuple[float, str, str]] = []
+        lexical_scores: List[float] = []
+        raw_items: List[Tuple[str, str, float, float]] = []
         for heading, body in sections:
             corpus = f"{heading} {body}".lower()
             section_terms = self._extract_terms(corpus)
             overlap = query_terms & section_terms
-            score = float(len(overlap) * 3)
+            lexical_score = float(len(overlap) * 3)
             for term in query_terms:
                 if len(term) >= 2 and term in corpus:
-                    score += 1.1
+                    lexical_score += 1.1
+            lexical_scores.append(lexical_score)
+            raw_items.append((heading, body, lexical_score, 0.0))
+
+        if query_embedding and section_vectors:
+            enriched_items: List[Tuple[str, str, float, float]] = []
+            for idx, (heading, body, lexical_score, _) in enumerate(raw_items):
+                vector_score = 0.0
+                if idx < len(section_vectors):
+                    vector = section_vectors[idx]
+                    if vector:
+                        vector_score = self._cosine_similarity(query_embedding, vector)
+                enriched_items.append((heading, body, lexical_score, vector_score))
+            raw_items = enriched_items
+
+        max_lexical_score = max(lexical_scores) if lexical_scores else 0.0
+        for heading, body, lexical_score, vector_score in raw_items:
+            lexical_norm = (
+                lexical_score / max_lexical_score if max_lexical_score > 0 else 0.0
+            )
+            if (
+                query_embedding
+                and vector_score > 0
+                and self.enable_hybrid_section_search
+                and vector_score >= self.min_section_vector_score
+            ):
+                score = (
+                    lexical_norm * self.hybrid_section_lexical_weight
+                    + vector_score * self.hybrid_section_vector_weight
+                )
+            else:
+                score = lexical_score
             ranked.append((score, heading, body))
 
         ranked.sort(key=lambda item: (-item[0], -len(item[2])))

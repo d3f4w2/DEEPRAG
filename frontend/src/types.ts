@@ -89,6 +89,12 @@ export interface ToolCall {
   };
 }
 
+export interface ToolResult {
+  role: string;
+  tool_call_id: string;
+  content: string;
+}
+
 export interface StreamChunk {
   type:
     | 'content'
@@ -104,7 +110,7 @@ export interface StreamChunk {
   content?: string;
   tool_calls?: ToolCall[];
   results?: ToolResult[];
-  usage?: Record<string, any>;
+  usage?: Record<string, unknown>;
   decision?: 'accept' | 'revise' | 'refuse';
   mode?: 'llm' | 'fallback' | 'rule' | string;
   stop?: boolean;
@@ -147,12 +153,6 @@ export interface StreamChunk {
     cost_multiplier?: number;
   };
   cost_estimate_usd?: number;
-}
-
-export interface ToolResult {
-  role: string;
-  tool_call_id: string;
-  content: string;
 }
 
 export interface RetrievalCritic {

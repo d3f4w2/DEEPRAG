@@ -129,11 +129,13 @@ User question
 |---|---:|---:|---|
 | Single-question retrieval context volume | 20,799 chars | 8,343 chars | `-59.9%` |
 | Single-question tool chain | `retrieve_files ×3` | `search_paths -> retrieve_sections` | Two-stage retrieval |
-| 40Q avg token (historical baseline) | 6,177.15 | 14,395.48 | dataset: `ragas评测集_40题` |
-| 40Q avg latency (historical baseline) | 13,721.10 ms | 39,080.38 ms | still needs cost/perf optimization |
-| 40Q faithfulness (RAGAS) | - | 39.86% | `评测/结果/optimized_ragas_40q_汇总.json` |
+| 40Q completion (latest full run) | - | `40 / 40`, failed `0` | `评测/结果/optimized_ragas_40q_v2_汇总.json` |
+| 40Q avg token (latest full run) | 6,177.15 | 16,293.77 | higher than baseline, still needs cost optimization |
+| 40Q avg latency (latest full run) | 13,721.10 ms | 34,562.76 ms | latest run on `2026-04-07` |
+| RAGAS usable questions (latest provider config) | - | `0 / 40` | parser incompatibility under current judge/provider |
+| Historical measurable faithfulness (older compatible run) | - | 39.86% | `评测/结果/optimized_ragas_40q_汇总.json` |
 
-> Note: with the current provider, some RAGAS parser compatibility issues still affect `context_recall` and `answer_correctness`; see the evaluation report notes.
+> Note: the latest end-to-end run is fully traceable for completion, token, and latency, but the current provider/judge combination still causes RAGAS parser incompatibility. Treat `39.86% faithfulness` as a historical measurable run, not the latest all-green benchmark.
 
 Interview-ready assets:
 - `优化/40题_RAGAS_优化后_vs_baseline.md`
