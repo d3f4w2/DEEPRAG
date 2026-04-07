@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, RefreshCw, Save } from 'lucide-react';
+import axios from 'axios';
 import { voiceApi } from '../api';
 
 import './VoiceIngestionPanel.css';
@@ -27,6 +28,30 @@ const getRecognitionCtor = (): (new () => RecognitionLike) | null => {
 
 const nowIsoLocal = () => new Date().toISOString();
 
+const parseApiError = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError(error)) {
+    const detail = (error.response?.data as any)?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+    if (Array.isArray(detail) && detail.length > 0) {
+      const joined = detail
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (item && typeof item === 'object' && 'msg' in item) return String(item.msg);
+          return JSON.stringify(item);
+        })
+        .join('; ');
+      if (joined) return joined;
+    }
+    if (error.message) return error.message;
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+};
+
 function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
   const [author, setAuthor] = useState('Unknown');
   const [source, setSource] = useState('Realtime microphone');
@@ -37,6 +62,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
 
   const [rawTranscript, setRawTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [manualTranscript, setManualTranscript] = useState('');
 
   const [aiDraftText, setAiDraftText] = useState('');
   const [aiSummary, setAiSummary] = useState('');
@@ -54,8 +80,12 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
   const summaryEditedRef = useRef(false);
 
   const liveTranscript = useMemo(() => {
+    const manual = manualTranscript.trim();
+    if (manual) {
+      return manual;
+    }
     return [rawTranscript, interimTranscript].filter(Boolean).join(' ').trim();
-  }, [rawTranscript, interimTranscript]);
+  }, [rawTranscript, interimTranscript, manualTranscript]);
 
   const requestDraft = async (transcript: string, forceApply = false, silent = false) => {
     const normalized = transcript.trim();
@@ -94,7 +124,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       if (reqId !== draftReqIdRef.current) {
         return;
       }
-      const detail = error instanceof Error ? error.message : 'Failed to generate voice draft.';
+      const detail = parseApiError(error, 'Failed to generate voice draft.');
       setErrorMessage(detail);
     } finally {
       if (!silent && reqId === draftReqIdRef.current) {
@@ -187,6 +217,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
     if (!recognitionRef.current) {
       return;
     }
+    setManualTranscript('');
     setErrorMessage('');
     setStatusMessage('');
     try {
@@ -222,6 +253,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
     handleStopRecording();
     setRawTranscript('');
     setInterimTranscript('');
+    setManualTranscript('');
     setAiDraftText('');
     setAiSummary('');
     setFinalTranscript('');
@@ -265,23 +297,12 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       });
       setStatusMessage(`已写入知识库：${saved.file_path}`);
     } catch (error) {
-      const detail = error instanceof Error ? error.message : 'Failed to ingest voice note.';
+      const detail = parseApiError(error, 'Failed to ingest voice note.');
       setErrorMessage(detail);
     } finally {
       setIsSaving(false);
     }
   };
-
-  if (!speechSupported) {
-    return (
-      <div className="voice-page">
-        <div className="voice-card">
-          <h2>语音入库</h2>
-          <p>当前浏览器不支持实时语音识别，请使用 Chrome/Edge 并允许麦克风权限。</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="voice-page" translate="no">
@@ -289,6 +310,11 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
         <h2>语音资料入库（实时）</h2>
         <p>流程：实时语音转写 → LLM 生成草稿与摘要 → 人工校对 → 确认入库。</p>
       </div>
+      {!speechSupported && (
+        <div className="voice-status error">
+          浏览器语音识别不可用，已切换为手动输入模式。你仍可输入文本并完成 AI 草稿与入库。
+        </div>
+      )}
 
       <div className="voice-card voice-controls">
         <div className="voice-field">
@@ -313,11 +339,14 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
           <button
             className={`voice-action ${isRecording ? 'stop' : 'start'}`}
             onClick={isRecording ? handleStopRecording : handleStartRecording}
+            disabled={!speechSupported}
             type="button"
           >
             <Mic size={16} />
             <span className={`voice-rec-dot ${isRecording ? 'on' : 'off'}`} aria-hidden />
-            <span>{isRecording ? '停止录音' : '开始录音'}</span>
+            <span>
+              {!speechSupported ? '录音不可用' : isRecording ? '停止录音' : '开始录音'}
+            </span>
           </button>
           <button
             className="voice-action secondary"
@@ -337,7 +366,22 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       <div className="voice-grid">
         <div className="voice-card">
           <h3>实时转写（原始）</h3>
-          <textarea value={liveTranscript} readOnly placeholder="录音后这里会实时显示转写文本..." />
+          <textarea
+            value={liveTranscript}
+            readOnly={isRecording}
+            onChange={(e) => {
+              setManualTranscript(e.target.value);
+              if (e.target.value.trim()) {
+                setInterimTranscript('');
+              }
+            }}
+            placeholder={
+              speechSupported
+                ? '录音后这里会实时显示转写文本，也可手动粘贴文本...'
+                : '语音不可用，请在此输入或粘贴转写文本...'
+            }
+          />
+          <label className="voice-sub-label">支持手动输入，输入后可直接同步 AI 草稿。</label>
         </div>
 
         <div className="voice-card">

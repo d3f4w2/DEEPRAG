@@ -359,78 +359,144 @@ async def run_vision_analysis(
     if len(clipped_ocr) > MAX_VISION_OCR_CHARS:
         clipped_ocr = clipped_ocr[:MAX_VISION_OCR_CHARS]
 
-    messages: List[Dict[str, Any]] = [
-        {
-            "role": "system",
-            "content": (
-                "You are an image analyst for RAG ingestion. "
-                "Return strict JSON only, no markdown. "
-                "Schema: {"
-                "\"visual_summary\": string, "
-                "\"visual_description\": string, "
-                "\"tags\": string[], "
-                "\"retrieval_keywords\": string[]"
-                "}. "
-                "Requirements: "
-                "1) visual_summary and visual_description must be bilingual in one string (Chinese first, then English). "
-                "2) tags and retrieval_keywords should include Chinese+English terms for objects, scene, attributes, and intent-level terms. "
-                "3) retrieval_keywords should be 8-20 concise search terms suitable for lexical retrieval. "
-                "4) Do not fabricate details not visible in the image."
-            ),
-        },
-        {
-            "role": "user",
-            "content": [
+    system_prompt = (
+        "You are an image analyst for RAG ingestion. "
+        "Return strict JSON only, no markdown. "
+        "Schema: {"
+        "\"visual_summary\": string, "
+        "\"visual_description\": string, "
+        "\"tags\": string[], "
+        "\"retrieval_keywords\": string[]"
+        "}. "
+        "Requirements: "
+        "1) visual_summary and visual_description must be bilingual in one string (Chinese first, then English). "
+        "2) tags and retrieval_keywords should include Chinese+English terms for objects, scene, attributes, and intent-level terms. "
+        "3) retrieval_keywords should be 8-20 concise search terms suitable for lexical retrieval. "
+        "4) Do not fabricate details not visible in the image."
+    )
+    user_text = (
+        f"Author: {author or 'Unknown'}\n"
+        f"Source: {source or 'Image upload'}\n"
+        f"OCR_TEXT:\n{clipped_ocr or '(empty)'}\n\n"
+        "Please provide a concise summary, detailed visual description, and 3-8 tags."
+    )
+
+    async def _invoke(messages: List[Dict[str, Any]], label: str) -> str:
+        raw_output = ""
+        try:
+            async for chunk_str in provider.chat_completion(messages=messages, tools=None, stream=False):
+                chunk = json.loads(chunk_str)
+                if chunk.get("type") == "content":
+                    raw_output += str(chunk.get("content") or "")
+        except Exception as e:
+            raise RuntimeError(f"{label}: request failed: {e}") from e
+        return raw_output.strip()
+
+    def _parse_result(raw_output: str, label: str) -> Tuple[Optional[Dict[str, Any]], str]:
+        if not raw_output:
+            return None, f"{label}: empty response"
+        if raw_output.lower().startswith("error:"):
+            return None, f"{label}: {raw_output[:220]}"
+
+        parsed = _extract_json_object(raw_output)
+        if not parsed:
+            preview = raw_output.replace("\n", " ")[:220]
+            return None, f"{label}: invalid json preview={preview}"
+
+        visual_summary = normalize_text(str(parsed.get("visual_summary") or ""))
+        visual_description = normalize_text(str(parsed.get("visual_description") or ""))
+        tags = _safe_tags(parsed.get("tags"))
+        retrieval_keywords = _safe_tags(parsed.get("retrieval_keywords"))
+
+        if not visual_summary:
+            return None, f"{label}: missing visual_summary"
+        if not visual_description:
+            return None, f"{label}: missing visual_description"
+        if not retrieval_keywords:
+            retrieval_keywords = tags[:]
+
+        return (
+            {
+                "visual_summary": visual_summary,
+                "visual_description": visual_description,
+                "tags": tags,
+                "retrieval_keywords": retrieval_keywords,
+            },
+            "",
+        )
+
+    message_variants: List[Tuple[str, List[Dict[str, Any]]]] = [
+        (
+            "image_url_object",
+            [
+                {"role": "system", "content": system_prompt},
                 {
-                    "type": "text",
-                    "text": (
-                        f"Author: {author or 'Unknown'}\n"
-                        f"Source: {source or 'Image upload'}\n"
-                        f"OCR_TEXT:\n{clipped_ocr or '(empty)'}\n\n"
-                        "Please provide a concise summary, detailed visual description, and 3-8 tags."
-                    ),
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {"url": data_url},
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
                 },
             ],
-        },
+        ),
+        (
+            "image_url_string",
+            [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": data_url},
+                    ],
+                },
+            ],
+        ),
+        (
+            "input_image_style",
+            [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": user_text},
+                        {"type": "input_image", "image_url": data_url},
+                    ],
+                },
+            ],
+        ),
     ]
 
-    raw_output = ""
-    try:
-        async for chunk_str in provider.chat_completion(messages=messages, tools=None, stream=False):
-            chunk = json.loads(chunk_str)
-            if chunk.get("type") == "content":
-                raw_output += str(chunk.get("content") or "")
-    except Exception as e:
-        raise RuntimeError(f"Vision model request failed: {e}") from e
+    diagnostics: List[str] = []
+    for label, messages in message_variants:
+        raw_output = await _invoke(messages, label)
+        parsed_result, error = _parse_result(raw_output, label)
+        if parsed_result:
+            return parsed_result
+        diagnostics.append(error)
 
-    if not raw_output.strip():
-        raise RuntimeError("Vision model returned empty response.")
-    if raw_output.strip().lower().startswith("error:"):
-        raise RuntimeError(raw_output.strip())
+    # Graceful fallback: generate structured fields from OCR text only,
+    # so image ingestion still works even when gateway vision format is incompatible.
+    text_only_messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": (
+                f"{user_text}\n\n"
+                "Vision input may be unavailable. Please infer from OCR text only, "
+                "and mention that this is OCR-based."
+            ),
+        },
+    ]
+    raw_output = await _invoke(text_only_messages, "ocr_only_fallback")
+    parsed_result, error = _parse_result(raw_output, "ocr_only_fallback")
+    if parsed_result:
+        return parsed_result
+    diagnostics.append(error)
 
-    parsed = _extract_json_object(raw_output)
-    if not parsed:
-        raise RuntimeError("Vision model did not return valid JSON.")
-
-    visual_summary = normalize_text(str(parsed.get("visual_summary") or ""))
-    visual_description = normalize_text(str(parsed.get("visual_description") or ""))
-    tags = _safe_tags(parsed.get("tags"))
-    retrieval_keywords = _safe_tags(parsed.get("retrieval_keywords"))
-
-    if not visual_summary:
-        raise RuntimeError("Vision model JSON missing field: visual_summary.")
-    if not visual_description:
-        raise RuntimeError("Vision model JSON missing field: visual_description.")
-    if not retrieval_keywords:
-        retrieval_keywords = tags[:]
-
-    return {
-        "visual_summary": visual_summary,
-        "visual_description": visual_description,
-        "tags": tags,
-        "retrieval_keywords": retrieval_keywords,
-    }
+    details = " | ".join(item for item in diagnostics if item)[:900]
+    raise RuntimeError(
+        "Vision model returned empty/invalid response "
+        f"(provider={provider.provider}, model={provider.config.get('model')}). "
+        f"attempts={details}"
+    )
