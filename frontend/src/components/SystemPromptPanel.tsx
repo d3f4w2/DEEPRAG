@@ -33,7 +33,7 @@ const SystemPromptPanel: React.FC<SystemPromptPanelProps> = ({ onClose }) => {
     <div className="sp-overlay">
       <div className="sp-panel" onClick={(e) => e.stopPropagation()}>
         <div className="sp-header">
-          <h2>System Prompt</h2>
+          <h2>系统提示词</h2>
           <button className="close-button" onClick={onClose}>
             <X size={20} />
           </button>
@@ -43,7 +43,7 @@ const SystemPromptPanel: React.FC<SystemPromptPanelProps> = ({ onClose }) => {
           {loading ? (
             <div className="sp-loading">
               <Loader2 className="spinner" size={32} />
-              <p>Loading system prompt...</p>
+              <p>正在加载系统提示词...</p>
             </div>
           ) : (
             <div className="sp-markdown">

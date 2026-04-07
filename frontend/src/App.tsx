@@ -37,6 +37,42 @@ const STAGE_LABELS: Record<string, string> = {
   execute: 'Execute',
   critic: 'Judge',
 };
+const HERO_ACTIONS = [
+  {
+    label: '整理会议纪要',
+    prompt: '请根据最近一周的知识库内容，整理一份结构化会议纪要。',
+  },
+  {
+    label: '追问证据来源',
+    prompt: '请回答并严格给出来源文件和证据片段。',
+  },
+  {
+    label: '语音笔记入库',
+    prompt: '给我一份语音入库的标准操作步骤。',
+  },
+];
+const COMMUNITY_SHOWCASE = [
+  {
+    quote: '“在同一个界面里完成检索、判断、追问证据，节奏非常顺。”',
+    author: '@Ava_Research',
+    prompt: '帮我演示一次带证据约束的完整问答。',
+  },
+  {
+    quote: '“我最喜欢 Judge 面板，能直观看到答案为什么被放行或拦截。”',
+    author: '@Mark_Data',
+    prompt: '解释一下 Judge 的判定逻辑和关键指标。',
+  },
+  {
+    quote: '“语音和图片入库后，跨模态检索质量明显提升。”',
+    author: '@Lin_PM',
+    prompt: '给我一份语音+图片混合入库的最佳实践。',
+  },
+  {
+    quote: '“预算控制和成本可视化很实用，适合团队长期跑。”',
+    author: '@Echo_MLOps',
+    prompt: '如何设置 token、时延和成本预算更稳妥？',
+  },
+];
 
 const toNumber = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
@@ -584,20 +620,32 @@ function App() {
       <header className="header">
         <div className="header-content">
           <div className="header-title">
-            <h1>📳 Deep RAG</h1>
+            <button
+              className="brand-button"
+              type="button"
+              onClick={() => setActivePage('chat')}
+            >
+              <span className="brand-badge" aria-hidden />
+              <span className="brand-copy">
+                <strong>DeepRAG</strong>
+                <small>真正行动的知识智能</small>
+              </span>
+            </button>
             <div className="header-nav">
               <button
                 className={`nav-button ${activePage === 'chat' ? 'active' : ''}`}
                 onClick={() => setActivePage('chat')}
                 title="Chat"
+                type="button"
               >
                 <MessageSquare size={16} />
-                <span>Chat</span>
+                <span>问答</span>
               </button>
               <button
                 className={`nav-button ${activePage === 'voice' ? 'active' : ''}`}
                 onClick={() => setActivePage('voice')}
                 title="Voice Ingestion"
+                type="button"
               >
                 <Mic size={16} />
                 <span>语音入库</span>
@@ -606,6 +654,7 @@ function App() {
                 className={`nav-button ${activePage === 'image' ? 'active' : ''}`}
                 onClick={() => setActivePage('image')}
                 title="Image Ingestion"
+                type="button"
               >
                 <ImageIcon size={16} />
                 <span>图片入库</span>
@@ -618,6 +667,7 @@ function App() {
                 className="icon-button"
                 onClick={() => setShowSystemPrompt(!showSystemPrompt)}
                 title="System Prompt"
+                type="button"
               >
                 <FileCode size={20} />
               </button>
@@ -625,6 +675,7 @@ function App() {
                 className="icon-button"
                 onClick={() => setShowConfigPanel(!showConfigPanel)}
                 title="Configuration"
+                type="button"
               >
                 <Settings size={20} />
               </button>
@@ -650,30 +701,74 @@ function App() {
               <SystemPromptPanel onClose={() => setShowSystemPrompt(false)} />
             )}
 
-            <div className="chat-container" ref={chatContainerRef}>
+            <div
+              className={`chat-container ${messages.length === 0 ? 'is-empty' : 'is-active'}`}
+              ref={chatContainerRef}
+            >
               {messages.length === 0 ? (
                 <div className="welcome-screen">
-                  <h2>Welcome to Deep RAG</h2>
-                  <p>
-                    Ask questions about your knowledge base and I'll help you find the answers.
-                  </p>
-                  <div className="example-questions">
-                    <h3>Example Questions:</h3>
-                    <ul>
-                      <li onClick={() => handleSendMessage('What display types do we have besides AMOLED and OLED?')}>
-                        What display types do we have besides AMOLED and OLED?
-                      </li>
-                      <li onClick={() => handleSendMessage('Which devices have waterproof ratings higher than IP67?')}>
-                        Which devices have waterproof ratings higher than IP67?
-                      </li>
-                      <li onClick={() => handleSendMessage('Which Bluetooth audio device has the longest battery life?')}>
-                        Which Bluetooth audio device has the longest battery life?
-                      </li>
-                      <li onClick={() => handleSendMessage('What was the total number of retail stores nationwide last year?')}>
-                        What was the total number of retail stores nationwide last year?
-                      </li>
-                    </ul>
-                  </div>
+                  <section className="hero-panel">
+                    <div className="hero-mascot" aria-hidden>
+                      <span className="hero-ant hero-ant-left" />
+                      <span className="hero-ant hero-ant-right" />
+                      <span className="hero-eye hero-eye-left" />
+                      <span className="hero-eye hero-eye-right" />
+                    </div>
+                    <h2>DeepRAG</h2>
+                    <p className="hero-tagline">真正行动的人工智能。</p>
+                    <p className="hero-description">
+                      清理你的知识库，追踪证据链路，管理语音与图片资料，
+                      让每一次回答都可追溯、可验证、可交付。
+                    </p>
+                    <button
+                      className="hero-announcement"
+                      onClick={() => handleSendMessage('请介绍 DeepRAG 最新支持的能力模块。')}
+                      type="button"
+                    >
+                      <span className="hero-announcement-badge">新</span>
+                      <span>DeepRAG 已支持语音/图片统一入库与证据追踪</span>
+                    </button>
+                    <div className="hero-actions">
+                      {HERO_ACTIONS.map((action) => (
+                        <button
+                          key={action.label}
+                          className="hero-action-button"
+                          onClick={() => handleSendMessage(action.prompt)}
+                          type="button"
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="social-proof">
+                    <div className="social-proof-header">
+                      <h3>
+                        <span>&rsaquo;</span> 人们怎么说
+                      </h3>
+                      <button
+                        className="social-proof-link"
+                        onClick={() => handleSendMessage('总结用户对 DeepRAG 的典型反馈。')}
+                        type="button"
+                      >
+                        查看全部
+                      </button>
+                    </div>
+                    <div className="social-proof-grid">
+                      {COMMUNITY_SHOWCASE.map((item) => (
+                        <button
+                          key={item.author}
+                          className="social-proof-card"
+                          onClick={() => handleSendMessage(item.prompt)}
+                          type="button"
+                        >
+                          <p>{item.quote}</p>
+                          <span>{item.author}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
                 </div>
               ) : (
                 <div className="messages">
@@ -691,7 +786,7 @@ function App() {
                   {isLoading && (
                     <div className="loading-indicator">
                       <Loader2 className="spinner" size={20} />
-                      <span>Thinking...</span>
+                      <span>正在思考...</span>
                     </div>
                   )}
                   <div ref={messagesEndRef} />
@@ -762,8 +857,9 @@ function App() {
                     className="clear-button"
                     onClick={handleClearChat}
                     title="Clear chat"
+                    type="button"
                   >
-                    Clear
+                    清空
                   </button>
                 )}
                 <textarea
@@ -771,7 +867,7 @@ function App() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
                   onFocus={() => setTimeout(scrollToBottom, 100)}
-                  placeholder="Ask a question about your knowledge base..."
+                  placeholder="输入问题并回车发送，系统将返回可追溯证据..."
                   rows={1}
                   disabled={isLoading}
                 />
@@ -779,6 +875,7 @@ function App() {
                   onClick={() => handleSendMessage()}
                   disabled={!inputValue.trim() || isLoading}
                   className="send-button"
+                  type="button"
                 >
                   {isLoading ? <Loader2 className="spinner" size={20} /> : <Send size={20} />}
                 </button>
@@ -786,13 +883,13 @@ function App() {
             </div>
           </>
         ) : activePage === 'voice' ? (
-          <div className="chat-container">
+          <div className="chat-container workspace-shell">
             <VoiceErrorBoundary>
               <VoiceIngestionPanel provider={selectedProvider} />
             </VoiceErrorBoundary>
           </div>
         ) : (
-          <div className="chat-container">
+          <div className="chat-container workspace-shell">
             <ImageIngestionPanel provider={selectedProvider} />
           </div>
         )}

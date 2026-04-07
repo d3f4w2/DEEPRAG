@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+﻿import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ImagePlus, RefreshCw, Save, Upload } from 'lucide-react';
 import axios from 'axios';
 import { imageApi } from '../api';
@@ -91,7 +91,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
 
   const handleDraft = async () => {
     if (!selectedFile) {
-      setErrorMessage('Please choose an image first.');
+      setErrorMessage('请先选择图片文件。');
       return;
     }
     setIsDrafting(true);
@@ -162,15 +162,15 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
 
   const handleIngest = async () => {
     if (!selectedFile) {
-      setErrorMessage('Please choose an image first.');
+      setErrorMessage('请先选择图片文件。');
       return;
     }
     if (!finalSummary.trim()) {
-      setErrorMessage('Please confirm visual summary before ingestion.');
+      setErrorMessage('请先确认视觉摘要。');
       return;
     }
     if (!finalDescription.trim()) {
-      setErrorMessage('Please confirm visual description before ingestion.');
+      setErrorMessage('请先确认视觉描述。');
       return;
     }
 
@@ -190,7 +190,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
       formData.append('occurred_at', nowIsoLocal());
 
       const saved = await imageApi.ingest(formData);
-      setStatusMessage(`Saved image note: ${saved.file_path}`);
+      setStatusMessage(`已写入图片笔记：${saved.file_path}`);
     } catch (error) {
       setErrorMessage(parseApiError(error, 'Failed to ingest image note.'));
     } finally {
@@ -202,7 +202,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
     <div className="image-page" translate="no">
       <div className="image-card image-doc">
         <h2>图片资料入库（OCR + 视觉理解）</h2>
-        <p>流程：上传图片 → PaddleOCR识别文字 → 视觉模型生成摘要/描述 → 人工确认后入库。</p>
+        <p>流程：上传图片 → OCR 提取文本 → 视觉模型生成摘要/描述 → 人工确认后入库。</p>
       </div>
 
       <div className="image-card image-controls">
@@ -212,7 +212,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
             id="image-author"
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
-            placeholder="e.g. Alice"
+            placeholder="例如：Alice"
           />
         </div>
         <div className="image-field">
@@ -221,7 +221,7 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
             id="image-source"
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            placeholder="e.g. Product Screenshot / PPT Export"
+            placeholder="例如：产品截图 / PPT 导出"
           />
         </div>
         <div className="image-file">
@@ -237,15 +237,15 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
           />
         </div>
         <div className="image-buttons">
-          <button className="image-action primary" onClick={handleDraft} disabled={!selectedFile || isDrafting}>
+          <button className="image-action primary" onClick={handleDraft} disabled={!selectedFile || isDrafting} type="button">
             <ImagePlus size={16} />
             <span>{isDrafting ? '识别中...' : '识别并生成草稿'}</span>
           </button>
-          <button className="image-action secondary" onClick={handleUseLatestDraft} disabled={!hasDraft}>
+          <button className="image-action secondary" onClick={handleUseLatestDraft} disabled={!hasDraft} type="button">
             <RefreshCw size={16} />
             <span>使用最新草稿</span>
           </button>
-          <button className="image-action secondary" onClick={handleClear}>
+          <button className="image-action secondary" onClick={handleClear} type="button">
             清空
           </button>
         </div>
@@ -257,22 +257,22 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
           {previewUrl ? (
             <img src={previewUrl} alt="uploaded preview" />
           ) : (
-            <div className="image-placeholder">请选择图片文件</div>
+            <div className="image-placeholder">请先选择图片文件</div>
           )}
           {imageMeta && <div className="image-meta">{imageMeta}</div>}
         </div>
 
         <div className="image-card">
-          <h3>AI草稿（只读）</h3>
+          <h3>AI 草稿（只读）</h3>
           <label className="image-sub-label">视觉摘要</label>
           <textarea value={visualSummary} readOnly placeholder="visual summary..." />
           <label className="image-sub-label">视觉描述</label>
           <textarea value={visualDescription} readOnly placeholder="visual description..." />
-          <label className="image-sub-label">OCR文本</label>
+          <label className="image-sub-label">OCR 文本</label>
           <textarea value={ocrText} readOnly placeholder="ocr text..." />
           <label className="image-sub-label">Tags</label>
           <input value={tags.join(', ')} readOnly placeholder="tag1, tag2..." />
-          <label className="image-sub-label">检索关键词（LLM生成）</label>
+          <label className="image-sub-label">检索关键词（LLM 生成）</label>
           <input value={retrievalKeywords.join(', ')} readOnly placeholder="关键词..." />
         </div>
 
@@ -282,21 +282,21 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
           <textarea
             value={finalSummary}
             onChange={(e) => setFinalSummary(e.target.value)}
-            placeholder="请确认摘要后入库..."
+            placeholder="请确认摘要后再入库..."
           />
           <label className="image-sub-label">确认描述</label>
           <textarea
             value={finalDescription}
             onChange={(e) => setFinalDescription(e.target.value)}
-            placeholder="请确认图片描述后入库..."
+            placeholder="请确认描述后再入库..."
           />
-          <label className="image-sub-label">确认OCR文本</label>
+          <label className="image-sub-label">确认 OCR 文本</label>
           <textarea
             value={finalOcrText}
             onChange={(e) => setFinalOcrText(e.target.value)}
-            placeholder="可根据实际图片修订OCR文本..."
+            placeholder="可根据原图修正 OCR 文本..."
           />
-          <label className="image-sub-label">确认Tags（逗号分隔）</label>
+          <label className="image-sub-label">确认 Tags（逗号分隔）</label>
           <input
             value={finalTags}
             onChange={(e) => setFinalTags(e.target.value)}
@@ -306,10 +306,10 @@ function ImageIngestionPanel({ provider }: ImageIngestionPanelProps) {
           <input
             value={finalRetrievalKeywords}
             onChange={(e) => setFinalRetrievalKeywords(e.target.value)}
-            placeholder="中文+English关键词..."
+            placeholder="中文+English 关键词..."
           />
           <div className="image-confirm-actions">
-            <button className="image-action primary" onClick={handleIngest} disabled={isSaving || !selectedFile}>
+            <button className="image-action primary" onClick={handleIngest} disabled={isSaving || !selectedFile} type="button">
               <Save size={16} />
               <span>{isSaving ? '入库中...' : '确认入库'}</span>
             </button>

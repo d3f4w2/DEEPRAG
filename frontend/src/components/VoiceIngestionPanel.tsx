@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, RefreshCw, Save } from 'lucide-react';
 import { voiceApi } from '../api';
 
@@ -239,15 +239,15 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
     const finalAuthor = author.trim();
 
     if (!finalText) {
-      setErrorMessage('Please confirm transcript text before ingestion.');
+      setErrorMessage('请先确认最终转写文本。');
       return;
     }
     if (!finalBrief) {
-      setErrorMessage('Please confirm summary before ingestion.');
+      setErrorMessage('请先确认最终摘要。');
       return;
     }
     if (!finalAuthor) {
-      setErrorMessage('Please set an author for this voice note.');
+      setErrorMessage('请先设置作者。');
       return;
     }
 
@@ -263,7 +263,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
         raw_transcript: liveTranscript,
         occurred_at: nowIsoLocal(),
       });
-      setStatusMessage(`Saved to knowledge base: ${saved.file_path}`);
+      setStatusMessage(`已写入知识库：${saved.file_path}`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Failed to ingest voice note.';
       setErrorMessage(detail);
@@ -287,7 +287,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
     <div className="voice-page" translate="no">
       <div className="voice-card voice-doc">
         <h2>语音资料入库（实时）</h2>
-        <p>流程：实时语音转写 → LLM实时生成草稿与摘要 → 人工纠正 → 确认入库。</p>
+        <p>流程：实时语音转写 → LLM 生成草稿与摘要 → 人工校对 → 确认入库。</p>
       </div>
 
       <div className="voice-card voice-controls">
@@ -297,7 +297,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
             id="voice-author"
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
-            placeholder="e.g. Alice"
+            placeholder="例如：Alice"
           />
         </div>
         <div className="voice-field">
@@ -306,27 +306,29 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
             id="voice-source"
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            placeholder="e.g. Team Meeting / Phone Call"
+            placeholder="例如：周会 / 电话沟通"
           />
         </div>
         <div className="voice-buttons">
           <button
             className={`voice-action ${isRecording ? 'stop' : 'start'}`}
             onClick={isRecording ? handleStopRecording : handleStartRecording}
+            type="button"
           >
             <Mic size={16} />
             <span className={`voice-rec-dot ${isRecording ? 'on' : 'off'}`} aria-hidden />
-            <span>录音开/关</span>
+            <span>{isRecording ? '停止录音' : '开始录音'}</span>
           </button>
           <button
             className="voice-action secondary"
             onClick={() => void requestDraft(liveTranscript, true)}
             disabled={!liveTranscript || isDrafting}
+            type="button"
           >
             <RefreshCw size={16} />
-            <span>同步AI草稿</span>
+            <span>{isDrafting ? '生成中...' : '同步 AI 草稿'}</span>
           </button>
-          <button className="voice-action secondary" onClick={handleClear}>
+          <button className="voice-action secondary" onClick={handleClear} type="button">
             清空
           </button>
         </div>
@@ -335,14 +337,14 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
       <div className="voice-grid">
         <div className="voice-card">
           <h3>实时转写（原始）</h3>
-          <textarea value={liveTranscript} readOnly placeholder="录音后会实时显示转写文本..." />
+          <textarea value={liveTranscript} readOnly placeholder="录音后这里会实时显示转写文本..." />
         </div>
 
         <div className="voice-card">
-          <h3>LLM实时草稿（建议）</h3>
-          <textarea value={aiDraftText} readOnly placeholder="AI will draft polished text here..." />
-          <label className="voice-sub-label">AI摘要（建议）</label>
-          <textarea className="voice-summary" value={aiSummary} readOnly placeholder="AI summary..." />
+          <h3>AI 草稿（建议）</h3>
+          <textarea value={aiDraftText} readOnly placeholder="AI 将在这里生成润色文本..." />
+          <label className="voice-sub-label">AI 摘要（建议）</label>
+          <textarea className="voice-summary" value={aiSummary} readOnly placeholder="AI 摘要..." />
           {draftWarning && <div className="voice-warning">{draftWarning}</div>}
         </div>
 
@@ -354,7 +356,7 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
               textEditedRef.current = true;
               setFinalTranscript(e.target.value);
             }}
-            placeholder="请确认并纠正文本后再入库..."
+            placeholder="请确认并校正文本后再入库..."
           />
           <label className="voice-sub-label">确认摘要（可编辑）</label>
           <textarea
@@ -367,12 +369,17 @@ function VoiceIngestionPanel({ provider }: VoiceIngestionPanelProps) {
             placeholder="请确认摘要后再入库..."
           />
           <div className="voice-confirm-actions">
-            <button className="voice-action secondary" onClick={handleUseLatestDraft} disabled={!aiDraftText}>
-              使用最新AI草稿
+            <button
+              className="voice-action secondary"
+              onClick={handleUseLatestDraft}
+              disabled={!aiDraftText}
+              type="button"
+            >
+              使用最新 AI 草稿
             </button>
-            <button className="voice-action primary" onClick={handleIngest} disabled={isSaving}>
+            <button className="voice-action primary" onClick={handleIngest} disabled={isSaving} type="button">
               <Save size={16} />
-              <span>确认入库</span>
+              <span>{isSaving ? '入库中...' : '确认入库'}</span>
             </button>
           </div>
         </div>

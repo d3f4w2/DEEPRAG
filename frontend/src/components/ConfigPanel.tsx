@@ -75,7 +75,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onClose, onConfigUpdated }) =
     <div className="config-panel-overlay">
       <div className="config-panel editor-mode" ref={panelRef}>
         <div className="config-panel-header">
-          <h2>.env Configuration File</h2>
+          <h2>.env 配置文件</h2>
           <button className="close-button" onClick={onClose}>
             <X size={20} />
           </button>
@@ -84,7 +84,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onClose, onConfigUpdated }) =
         {loading ? (
           <div className="config-loading">
             <RefreshCw className="spin" size={24} />
-            <p>Loading configuration...</p>
+            <p>正在加载配置...</p>
           </div>
         ) : (
           <>
@@ -94,7 +94,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onClose, onConfigUpdated }) =
                 onChange={(e) => setContent(e.target.value)}
                 className="env-editor"
                 spellCheck={false}
-                placeholder="Edit .env file content here..."
+                placeholder="在这里编辑 .env 内容..."
               />
             </div>
 
@@ -103,12 +103,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onClose, onConfigUpdated }) =
                 {saving ? (
                   <>
                     <RefreshCw className="spin" size={16} />
-                    Saving...
+                    保存中...
                   </>
                 ) : (
                   <>
                     <Save size={16} />
-                    Save Configuration
+                    保存并生效
                   </>
                 )}
               </button>
